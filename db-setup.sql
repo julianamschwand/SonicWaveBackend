@@ -5,6 +5,20 @@ create table UserData (
   passwordHash varchar(255)
 );
 
+create table Playlists (
+  playlistId int primary key auto_increment,
+  playlistName varchar(20),
+  playlistDescription text,
+  fk_UserDataId int,
+  foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
+);
+
+create table Artists (
+  artistId int primary key auto_increment,
+  artistName varchar(20) unique,
+  artistDescription text
+);
+
 create table Songs (
   songId int primary key auto_increment,
   songFileName char(12),
@@ -16,14 +30,6 @@ create table Songs (
   fk_ArtistId int,
   foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade,
   foreign key (fk_ArtistId) references Artists(ArtistId)
-);
-
-create table Playlists (
-  playlistId int primary key auto_increment,
-  playlistName varchar(20),
-  playlistDescription text,
-  fk_UserDataId int,
-  foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
 );
 
 create table PlaylistSongs (
@@ -40,10 +46,4 @@ create table FavoriteSongs (
   fk_UserDataId int,
   foreign key (fk_SongId) references Songs(SongId) on delete cascade,
   foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
-);
-
-create table Artists (
-  artistId int primary key auto_increment,
-  artistName varchar(20) unique,
-  artistDescription text
 );

@@ -1,10 +1,10 @@
+import axios from 'axios'
 import { promises as readlinePromises} from 'readline' 
 import { queryRootDB } from './root-db.js'
 import { randomBytes } from 'crypto'
 import { platform } from 'os'
 import { createWriteStream } from 'fs'
 import { chmod, mkdir, writeFile, readFile } from 'fs/promises'
-import { get } from 'https'
 
 async function setupWizard() {
   // get root password for mariadb
@@ -115,21 +115,22 @@ async function setupWizard() {
 
     const file = createWriteStream(`./bin/${filename}`)
 
+    const response = await axios.get(url, { responseType: "stream" })
+    response.data.pipe(file)
+
     await new Promise((resolve, reject) => {
-      get(url, res => {
-        res.pipe(file)
-        file.on("finish", async () => {
-          file.close()
-          if (os !== "win32") {
-            await chmod(`./bin/${filename}`, 0o755)
-          }
-          console.log("Successfully downloaded " + download)
-          resolve()
-        })
-      }).on("error", reject)
+      file.on("finish", async () => {
+        file.close()
+        if (os !== "win32") {
+          await chmod(`./bin/${filename}`, 0o755)
+        }
+        console.log("Successfully downloaded " + download)
+        resolve()
+      })
+      file.on("error", reject)
     })
   }
-
+  
   // asking for node env
   let nodeEnvAnswer = ""
   let nodeEnv = ""

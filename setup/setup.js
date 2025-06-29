@@ -131,7 +131,7 @@ async function setupWizard() {
     })
   }
   
-  // asking for node env
+  // asking for additional information
   let nodeEnvAnswer = ""
   let nodeEnv = ""
 
@@ -148,13 +148,27 @@ async function setupWizard() {
     nodeEnv = "development"
   }
 
+  const originURL = await input.question("Enter your origin URL (URL of frontend): ")
+
+  const proxyNumber = await input.question("Enter your number of proxies: ")
+
+  const port = await input.question("Enter the port this program will be using: ")
+
   // writing .env file
   console.log("Creating .env file ...")
 
-  let envContent = `DB_NAME="SonicWave"\nDB_USER="SonicWaveUser"\nDB_HOST="${dbHost}"\nDB_PASS="${userPass}"\n\nSESSION_SECRET="${randomBytes(16).toString("hex")}"\n\nNODE_ENV="${nodeEnv}"\n\n`
+  let envContent = `DB_NAME="SonicWave"\n` + 
+  `DB_USER="SonicWaveUser"\n` +
+  `DB_HOST="${dbHost}"\n` +
+  `DB_PASS="${userPass}"\n\n` +
+  `SESSION_SECRET="${randomBytes(16).toString("hex")}"\n\n` +
+  `NODE_ENV="${nodeEnv}"\n` +
+  `ORIGIN_URL="${originURL}"\n` + 
+  `PROXY_NUMBER="${proxyNumber}"\n` +
+  `PORT="${port}"`
 
   for (const [key, value] of Object.entries(paths)) {
-    envContent += `${key.toUpperCase()}_PATH="${value}"\n`
+    envContent += `\n${key.toUpperCase()}_PATH="${value}"`
   }
 
   await writeFile("./.env", envContent, "utf-8")

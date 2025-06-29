@@ -26,6 +26,7 @@ create table Songs (
   genre varchar(20),
   duration int,
   releaseYear int,
+  isFavorite boolean,
   fk_UserDataId int,
   fk_ArtistId int,
   foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade,
@@ -38,12 +39,4 @@ create table PlaylistSongs (
   fk_SongId int,
   foreign key (fk_PlaylistId) references Playlists(PlaylistId) on delete cascade,
   foreign key (fk_SongId) references Songs(SongId) on delete cascade
-);
-
-create table FavoriteSongs (
-  favoriteSongId int primary key auto_increment,
-  fk_SongId int,
-  fk_UserDataId int,
-  foreign key (fk_SongId) references Songs(SongId) on delete cascade,
-  foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
 );

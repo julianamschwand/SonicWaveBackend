@@ -27,6 +27,7 @@ create table Songs (
   duration int,
   releaseYear int,
   isFavorite boolean,
+  lastPlayed timestamp,
   fk_UserDataId int,
   fk_ArtistId int,
   foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade,

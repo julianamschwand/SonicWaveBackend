@@ -149,9 +149,7 @@ async function setupWizard() {
   }
 
   const originURL = await input.question("Enter your origin URL (URL of frontend): ")
-
   const proxyNumber = await input.question("Enter your number of proxies: ")
-
   const port = await input.question("Enter the port this program will be using: ")
 
   // writing .env file
@@ -165,7 +163,7 @@ async function setupWizard() {
   `NODE_ENV="${nodeEnv}"\n` +
   `ORIGIN_URL="${originURL}"\n` + 
   `PROXY_NUMBER="${proxyNumber}"\n` +
-  `PORT="${port}"`
+  `PORT="${port}"\n`
 
   for (const [key, value] of Object.entries(paths)) {
     envContent += `\n${key.toUpperCase()}_PATH="${value}"`

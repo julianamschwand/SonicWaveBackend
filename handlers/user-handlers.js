@@ -2,7 +2,7 @@ import { db } from '../db.js'
 
 // get the userdata from a single user
 export async function userdata(req, res) {
-  
+
 }
 
 // register a new user
@@ -52,5 +52,10 @@ export async function approveRegister(req, res) {
 
 // deny a register request. Only accessible to admin and owner
 export async function denyRegister(req, res) {
+
+}
+
+// get all register requests. Only accessible by admin and owner
+export async function registerRequests(req, res) {
 
 }

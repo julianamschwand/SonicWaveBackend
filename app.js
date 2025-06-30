@@ -3,8 +3,12 @@ import session from 'express-session'
 import cors from 'cors'
 import dotenv from "dotenv"
 import { existsSync } from 'fs'
+
 import { createSessionStore } from "./db.js"
 import setupWizard from './setup/setup.js'
+import * as userHandlers from './handlers/user-handlers.js'
+import * as songHandlers from './handlers/song-handlers.js'
+import * as playlistHandlers from './handlers/playlist-handlers.js'
 dotenv.config()
 
 if (!existsSync("./.env")) {

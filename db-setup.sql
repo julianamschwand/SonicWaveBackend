@@ -3,6 +3,7 @@ create table UserData (
   username varchar(50) unique,
   email varchar(254) unique,
   passwordHash varchar(255),
+  userRole enum('user','admin','owner'),
   approved boolean
 );
 

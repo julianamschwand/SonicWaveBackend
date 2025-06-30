@@ -1,4 +1,5 @@
 import axios from 'axios'
+import bcrypt from 'bcrypt'
 import { promises as readlinePromises} from 'readline' 
 import { queryRootDB } from './root-db.js'
 import { randomBytes } from 'crypto'
@@ -81,6 +82,21 @@ async function setupWizard() {
     console.log("Didn't create database")
     userPass = await input.question("Password for database user: ")
   }
+
+  // create the website owner
+  const ownerName = await input.question("Enter the name for the website owner: ")
+  const ownerEmail = await input.question("Enter the email for the website owner: ")
+  const ownerPassword = await input.question("Enter the password for the website owner: ")
+
+  const hashedOwnerPassword = await bcrypt.hash(ownerPassword, 10)
+
+  await queryRootDB(rootPass, dbHost,
+    `use SonicWave;
+    insert into UserData (username, email, passwordHash, userRole, approved) 
+    values ('${ownerName}','${ownerEmail}','${hashedOwnerPassword}','owner',true);`
+  )
+
+  console.log("Successfully created owner")
 
   // yt-dlp and spotDL download
   const os = platform()

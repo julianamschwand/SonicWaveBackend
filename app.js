@@ -41,7 +41,45 @@ app.use(session({
   }
 }))
 
-// routes here
+
+// user routes
+
+const userRouter = express.Router()
+
+userRouter.get("/userdata", userHandlers.userdata)
+userRouter.post("/register", userHandlers.register)
+userRouter.post("/login", userHandlers.login)
+userRouter.post("/logout", userHandlers.logout)
+
+app.use("/users", userRouter)
+
+// song routes
+
+const songRouter = express.Router()
+
+songRouter.get("/play-song", songHandlers.playSong)
+songRouter.post("/download-song", songHandlers.downloadSong)
+songRouter.get("/browse-songs", songHandlers.browseSongs)
+songRouter.get("/songs", songHandlers.songs)
+songRouter.patch("/edit-song", songHandlers.editSong)
+songRouter.delete("/delete-song", songHandlers.deleteSong)
+songRouter.post("/favorite-song", songHandlers.favoriteSong)
+songRouter.post("/unfavorite-song", songHandlers.unfavoriteSong)
+
+app.use("/songs", songRouter)
+
+// playlists
+
+const playlistRouter = express.Router()
+
+playlistRouter.post("/create-playlist", playlistHandlers.createPlaylist)
+playlistRouter.patch("/edit-playlist", playlistHandlers.editPlaylist)
+playlistRouter.delete("/delete-playlist", playlistHandlers.deletePlaylist)
+playlistRouter.post("/add-to-playlist", playlistHandlers.addToPlaylist)
+playlistRouter.delete("/all-playlists", playlistHandlers.allPlaylists)
+playlistRouter.get("/playlist", playlistHandlers.playlist)
+
+app.use("/playlists", playlistRouter)
 
 const port = process.env.PORT
 

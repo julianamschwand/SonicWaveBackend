@@ -114,7 +114,6 @@ async function setupWizard() {
     console.log(`Downloading ${download} ...`)
 
     const file = createWriteStream(`./bin/${filename}`)
-
     const response = await axios.get(url, { responseType: "stream" })
     response.data.pipe(file)
 
@@ -175,7 +174,9 @@ async function setupWizard() {
 
   input.close()
 
-  console.log("\nSetup complete!")
+  console.log("\nSetup complete! Restart the program")
+
+  process.exit(0)
 }
 
 export default setupWizard

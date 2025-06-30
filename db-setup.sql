@@ -2,7 +2,8 @@ create table UserData (
   userDataId int primary key auto_increment,
   username varchar(50) unique,
   email varchar(254) unique,
-  passwordHash varchar(255)
+  passwordHash varchar(255),
+  approved boolean
 );
 
 create table Playlists (

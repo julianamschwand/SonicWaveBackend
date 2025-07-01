@@ -94,8 +94,13 @@ export async function loginState(req, res) {
   }
 }
 
-// reset the password of a user by old password or email 2FA
-export async function resetPassword(req, res) {
+// change the password of a user by old password or email 2FA
+export async function changePassword(req, res) {
+
+}
+
+// send a code to reset the password (or maybe login later on)
+export async function send2FACode(req, res) {
 
 }
 

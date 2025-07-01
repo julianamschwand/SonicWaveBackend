@@ -156,6 +156,38 @@ export async function approveRegister(req, res) {
 export async function denyRegister(req, res) {
   if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
 
+  const {userDataId} = req.body
+  if (!userDataId) return res.status(400).json({success: false, message: "Missing data"})
+  
+  try {
+    const [reqUser] = await db.query("select userRole from UserData where userDataId = ?", [req.session.user.id])
+
+    if (reqUser[0].userRole !== "owner" && reqUser[0].userRole !== "admin") {
+      return res.status(403).json({success: false, message: "Only admins and the owner can deny register requests"})
+    } 
+
+    try {
+      const [dbUser] = await db.query("select username, approved from UserData where userDataId = ?", [userDataId])
+
+      if (dbUser.length === 0) return res.status(404).json({success: false, message: "Register request not found"})
+      if (dbUser[0].approved) return res.status(409).json({success: false, message: "User is already registered"})
+      
+      try {
+        await db.query("delete from UserData where userDataId = ?", [userDataId])
+
+        res.status(200).json({success: true, message: `Successfully denied and deleted the register request of user '${dbUser[0].username}'`})
+      } catch (error) {
+        console.error("Error:", error)
+        res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
+      }
+    } catch (error) {
+      console.error("Error:", error)
+      res.status(500).json({success: false, message: "Error while retrieving register requests from the database"})
+    }
+  } catch (error) {
+    console.error("Error:", error)
+    res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
+  }
 }
 
 // get all register requests. Only accessible by admin and owner

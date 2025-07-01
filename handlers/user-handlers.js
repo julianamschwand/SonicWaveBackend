@@ -6,7 +6,7 @@ export async function userdata(req, res) {
   if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
   
   try {
-    const [user] = await db.query("select username, email from UserData where userDataId = ?", [req.session.user.id])
+    const [user] = await db.query("select username, email, userRole from UserData where userDataId = ?", [req.session.user.id])
 
     res.status(200).json({success: true, user: user[0]})
   } catch (error) {
@@ -29,7 +29,7 @@ export async function register(req, res) {
 
     try {
       const hashedpassword = await bcrypt.hash(password, 10)
-      await db.query("insert into UserData (username, email, passwordHash, approved) values (?,?,?,false)", [username, email, hashedpassword])
+      await db.query("insert into UserData (username, email, passwordHash, approved, userRole) values (?,?,?,false,'user')", [username, email, hashedpassword])
 
       res.status(200).json({success: true, message: "Register request sent successfully"})
     } catch (error) {
@@ -58,12 +58,12 @@ export async function login(req, res) {
 
     if (dbUser.length === 0) return res.status(404).json({success: false, error: "User not found"})
 
-    const isPasswordValid = await bcrypt.compare(password, dbUser[0].PasswordHash)
+    const isPasswordValid = await bcrypt.compare(password, dbUser[0].passwordHash)
     if (!isPasswordValid) return res.status(401).json({success: false, error: "Wrong password"})
 
     if (!dbUser[0].approved) return res.status(403).json({success: false, error: "Register request hasn't been approved yet"})
 
-    req.session.user = { id: user.UserDataId }
+    req.session.user = { id: dbUser[0].userDataId }
     res.status(200).json({success: true, message: "User successfully logged in"})
   } catch (error) {
     console.error("Error:", error)
@@ -116,15 +116,37 @@ export async function removeAdmin(req, res) {
 
 // approve a register request. Only accessible to admin and owner
 export async function approveRegister(req, res) {
+  if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
 
 }
 
 // deny a register request. Only accessible to admin and owner
 export async function denyRegister(req, res) {
+  if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
 
 }
 
 // get all register requests. Only accessible by admin and owner
 export async function registerRequests(req, res) {
+  if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
 
+  try {
+    const [user] = await db.query("select userRole from UserData where userDataId = ?", [req.session.user.id])
+
+    if (user[0].userRole !== "owner" && user[0].userRole !== "admin") {
+      return res.status(403).json({success: false, error: "Only admins and the owner can see register requests"})
+    } 
+
+    try {
+      const [regRequests] = await db.query("select userDataId, username, email from UserData where approved = false")
+
+      res.status(200).json({success: true, requests: regRequests})
+    } catch (error) {
+      console.error("Error:", error)
+      res.status(500).json({success: false, error: "Error while retrieving register requests from the database"})
+    }
+  } catch (error) {
+    console.error("Error:", error)
+    res.status(500).json({success: false, error: "Error while retrieving userdata from the database"})
+  }
 }

@@ -1,5 +1,6 @@
-import { db } from '../db.js'
 import bcrypt from 'bcrypt'
+import { db } from '../db.js'
+import { mailer } from '../mailer.js'
 
 // get the userdata from a single user
 export async function userdata(req, res) {
@@ -10,7 +11,7 @@ export async function userdata(req, res) {
 
     res.status(200).json({success: true, message: "Successfully retrieved userdata from database", user: user[0]})
   } catch (error) {
-    console.error("Error:", error)
+    console.error(error)
     res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
   }
 }
@@ -33,11 +34,11 @@ export async function register(req, res) {
 
       res.status(200).json({success: true, message: "Register request sent successfully"})
     } catch (error) {
-      console.error("Error:", error)
+      console.error(error)
       res.status(500).json({success: false, message: "Error while registering"})
     }
   } catch (error) {
-    console.error("Error:", error)
+    console.error(error)
     res.status(500).json({success: false, message: "Error while fetching userdata from the database"})
   }
 }
@@ -66,7 +67,7 @@ export async function login(req, res) {
     req.session.user = { id: dbUser[0].userDataId }
     res.status(200).json({success: true, message: "User successfully logged in"})
   } catch (error) {
-    console.error("Error:", error)
+    console.error(error)
     res.status(500).json({success: false, message: "Error while logging in"})
   }
 }
@@ -80,7 +81,7 @@ export async function logout(req, res) {
     res.clearCookie('SessionId')
     res.status(200).json({success: true, message: 'Logged out successfully'})
   } catch (error) {
-    console.error("Error:", error)
+    console.error(error)
     res.status(500).json({success: false, message: "Error while logging out"})
   }
 }
@@ -96,12 +97,97 @@ export async function loginState(req, res) {
 
 // change the password of a user by old password or email 2FA
 export async function changePassword(req, res) {
+  const {email, passwordOld, passwordNew, otp} = req.body
+  let userDataId = undefined;
+  if (req.session.user.id) userDataId = req.session.user.id
+  if ((!userDataId && !email) || (!passwordOld && !otp) || !passwordNew) return res.status(400).json({success: false, message: "Missing data"})
+  
+  try {
+    if (!userDataId) {
+      const [dbUser] = db.query("select userDataId from UserData where email = ?", [email])
+      userDataId = dbUser[0].userDataId;
+    }
 
+    try {
+      if (passwordOld) {
+        const [dbUser] = await db.query("select passwordHash from UserData where userDataId = ?", [userDataId])
+        const isPasswordValid = await bcrypt.compare(passwordOld, dbUser[0].passwordHash)
+        if (!isPasswordValid) return res.status(401).json({success: false, message: "Wrong password"})
+
+      } else {
+        const [dbOTP] = await db.query("select otp from OneTimePasswords where fk_UserDataId = ?", [userDataId])
+        if (dbOTP.length === 0) return res.status(404).json({success: false, message: "No valid OTP found for this account"})
+
+        if (dbOTP[0].otp !== otp) {
+          await db.query("update OneTimePasswords set attemptsRemaining = attemptsRemaining - 1 where fk_UserDataId = ?", [userDataId])
+          const [otpAtt] = await db.query("select attemptsRemaining from OneTimePasswords where fk_UserDataId = ?", [userDataId])
+          if (otpAtt[0].attemptsRemaining === 0) await db.query("delete from OneTimePasswords where fk_UserDataId = ?", [userDataId])
+
+          return res.status(401).json({success: false, message: "Wrong Password", attemptsRemaining: otpAtt[0].attemptsRemaining})
+        }
+
+        await db.query("delete from OneTimePasswords where fk_UserDataId = ?", [userDataId])
+      }
+
+      try {
+        const hashedpassword = await bcrypt.hash(passwordNew, 10)
+        await db.query("update UserData set passwordHash = ? where userDataId = ?", [hashedpassword, userDataId])
+
+        res.status(200).json({success: true, message: "Successfully changed password"})
+      } catch (error) {
+        console.error(error)
+        res.status(500).json({success: false, message: "Error while verifying request"})
+      }
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({success: false, message: "Error while verifying request"})
+    }
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({success: false, message: "Error while fetching userdata from the database"})
+  }
 }
 
 // send a code to reset the password (or maybe login later on)
-export async function send2FACode(req, res) {
+export async function sendOTP(req, res) {
+  const {email} = req.body
 
+  try {
+    const [dbUser] = await db.query("select userDataId from UserData where email = ?", [email])
+
+    if (dbUser.length === 0) return res.status(404).json({success: false, message: "No user with this E-Mail"})
+    
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let code = ''
+    for (let i = 0; i < 6; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)]
+    }
+
+    try {
+      await db.query("delete from OneTimePasswords where fk_UserDataId = ?", [dbUser[0].userDataId])
+      const [result] = await db.query("insert into OneTimePasswords (otp,fk_UserDataId) values (?,?)", [code, dbUser[0].userDataId])
+
+      try {
+        await mailer(email, "One Time Password", `Use this code: ${code}`)
+
+        res.status(200).json({success: true, message: "Successfully sent a OTP to your E-Mail"})
+
+        setTimeout(async () => {
+          await db.query("delete from OneTimePasswords where otpId = ?", [result.insertId])
+        }, 1000 * 60 * 3)
+      } catch (error) {
+        console.error(error)
+        res.status(500).json({success: false, message: "Error while sending the OTP"})
+        await db.query("delete from OneTimePasswords where otpId = ?", [result.insertId])
+      }
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({success: false, message: "Error while saving the code to the database"})
+    }
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({success: false, message: "Error while fetching userdata from the database"})
+  }
 }
 
 // delete a user. Only accessible to admin, owner or the user to be deleted
@@ -144,15 +230,15 @@ export async function approveRegister(req, res) {
 
         res.status(200).json({success: true, message: `Successfully approved the register request of user '${dbUser[0].username}'`})
       } catch (error) {
-        console.error("Error:", error)
+        console.error(error)
         res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
       }
     } catch (error) {
-      console.error("Error:", error)
+      console.error(error)
       res.status(500).json({success: false, message: "Error while retrieving register requests from the database"})
     }
   } catch (error) {
-    console.error("Error:", error)
+    console.error(error)
     res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
   }
 }
@@ -182,15 +268,15 @@ export async function denyRegister(req, res) {
 
         res.status(200).json({success: true, message: `Successfully denied and deleted the register request of user '${dbUser[0].username}'`})
       } catch (error) {
-        console.error("Error:", error)
+        console.error(error)
         res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
       }
     } catch (error) {
-      console.error("Error:", error)
+      console.error(error)
       res.status(500).json({success: false, message: "Error while retrieving register requests from the database"})
     }
   } catch (error) {
-    console.error("Error:", error)
+    console.error(error)
     res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
   }
 }
@@ -211,11 +297,11 @@ export async function registerRequests(req, res) {
 
       res.status(200).json({success: true, message: "Successfully retrieved register requests from database", requests: regRequests})
     } catch (error) {
-      console.error("Error:", error)
+      console.error(error)
       res.status(500).json({success: false, message: "Error while retrieving register requests from the database"})
     }
   } catch (error) {
-    console.error("Error:", error)
+    console.error(error)
     res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
   }
 }

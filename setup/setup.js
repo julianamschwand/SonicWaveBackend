@@ -167,6 +167,12 @@ async function setupWizard() {
   const proxyNumber = await input.question("Enter your number of proxies: ")
   const port = await input.question("Enter the port this program will be using: ")
 
+  // asking for smtp info
+  const smtpHost = await input.question("Enter your SMTP host: ")
+  const smtpPort = await input.question("Enter your SMTP port: ")
+  const smtpUser = await input.question("Enter your SMTP user: ")
+  const smtpPass = await input.question("Enter your SMTP password: ")
+
   // writing .env file
   console.log("Creating .env file ...")
 
@@ -178,7 +184,11 @@ async function setupWizard() {
   `NODE_ENV="${nodeEnv}"\n` +
   `ORIGIN_URL="${originURL}"\n` + 
   `PROXY_NUMBER="${proxyNumber}"\n` +
-  `PORT="${port}"\n`
+  `PORT="${port}"\n\n` + 
+  `SMTP_HOST="${smtpHost}"\n` +
+  `SMTP_PORT="${smtpPort}"\n` +
+  `SMTP_USER="${smtpUser}"\n` +
+  `SMTP_PASS="${smtpPass}"\n`
 
   for (const [key, value] of Object.entries(paths)) {
     envContent += `\n${key.toUpperCase()}_PATH="${value}"`

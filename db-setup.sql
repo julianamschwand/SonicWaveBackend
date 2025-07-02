@@ -43,3 +43,11 @@ create table PlaylistSongs (
   foreign key (fk_PlaylistId) references Playlists(PlaylistId) on delete cascade,
   foreign key (fk_SongId) references Songs(SongId) on delete cascade
 );
+
+create table OneTimePasswords (
+  otpId int primary key auto_increment,
+  otp char(6),
+  attemptsRemaining int default(3),
+  fk_UserDataId int,
+  foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
+);

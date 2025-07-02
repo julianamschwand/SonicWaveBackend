@@ -5,6 +5,7 @@ import dotenv from "dotenv"
 import { existsSync } from 'fs'
 
 import { createSessionStore } from "./db.js"
+import { smtpVerifier, mailer } from './mailer.js'
 import setupWizard from './setup/setup.js'
 import * as userHandlers from './handlers/user-handlers.js'
 import * as songHandlers from './handlers/song-handlers.js'
@@ -42,6 +43,7 @@ app.use(session({
   }
 }))
 
+await smtpVerifier()
 
 // user routes
 
@@ -52,8 +54,8 @@ userRouter.post("/register", userHandlers.register)
 userRouter.post("/login", userHandlers.login)
 userRouter.post("/logout", userHandlers.logout)
 userRouter.get("/login-state", userHandlers.loginState)
-userRouter.post("/change-password", userHandlers.changePassword)
-userRouter.get("/send-2fa-code", userHandlers.send2FACode)
+userRouter.patch("/change-password", userHandlers.changePassword)
+userRouter.get("/send-otp", userHandlers.sendOTP)
 userRouter.delete("/delete-user", userHandlers.deleteUser)
 userRouter.patch("/make-admin", userHandlers.makeAdmin)
 userRouter.patch("/remove-admin", userHandlers.removeAdmin)

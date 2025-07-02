@@ -192,7 +192,32 @@ export async function sendOTP(req, res) {
 
 // delete a user. Only accessible to admin, owner or the user to be deleted
 export async function deleteUser(req, res) {
+  if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
 
+  const {userDataId} = req.body
+  if (!userDataId) return res.status(400).json({success: false, message: "Missing data"})
+  
+  try {
+    const [reqUser] = await db.query("select * from UserData where userDataId = ?", [req.session.user.id])
+    const [dbUser] = await db.query("select * from UserData where userDataId = ?", [userDataId])
+
+    if (dbUser.length === 0) return res.status(404).json({success: false, message: "User not found"})
+    if (reqUser[0].userRole === "user") return res.status(403).json({success: false, message: "Only admins and the owner can delete users"})
+    if (dbUser[0].userRole === "owner") return res.status(403).json({success: false, message: "Can't delete owner"})
+    if (dbUser[0].userRole === "admin" && reqUser[0].userRole !== "owner") return res.status(403).json({success: false, message: "Can only delete admins as owner"})
+    
+    try {
+      await db.query("delete from UserData where userDataId = ?", [userDataId])
+
+      res.status(200).json({success: true, message: `Successfully deleted '${dbUser[0].username}'`})
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({success: false, message: "Error while deleting user"})
+    }
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
+  }
 }
 
 // promote a user to admin. Only accessible to owner

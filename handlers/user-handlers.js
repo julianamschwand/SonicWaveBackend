@@ -222,12 +222,80 @@ export async function deleteUser(req, res) {
 
 // promote a user to admin. Only accessible to owner
 export async function makeAdmin(req, res) {
+  if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
 
+  const {userDataId} = req.body
+  if (!userDataId) return res.status(400).json({success: false, message: "Missing data"})
+  
+  try {
+    const [reqUser] = await db.query("select userRole from UserData where userDataId = ?", [req.session.user.id])
+
+    if (reqUser[0].userRole !== "owner") {
+      return res.status(403).json({success: false, message: "Only the owner can manage user roles"})
+    } 
+
+    try {
+      const [dbUser] = await db.query("select username, userRole from UserData where userDataId = ?", [userDataId])
+
+      if (dbUser.length === 0) return res.status(404).json({success: false, message: "User not found"})
+      if (dbUser[0].userRole === "admin") return res.status(409).json({success: false, message: "User is already admin"})
+      if (dbUser[0].userRole === "owner") return res.status(403).json({success: false, message: "Can't change the owners role"})
+      
+      try {
+        await db.query("update UserData set userRole = 'admin' where userDataId = ?", [userDataId])
+
+        res.status(200).json({success: true, message: `Successfully promoted '${dbUser[0].username}' to admin`})
+      } catch (error) {
+        console.error(error)
+        res.status(500).json({success: false, message: "Error while promoting user"})
+      }
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({success: false, message: "Error while retrieving the requested users userdata from the database"})
+    }
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({success: false, message: "Error while retrieving the requesting users userdata from the database"})
+  }
 }
 
 // demote an admin to user. Only accessible by owner
 export async function removeAdmin(req, res) {
+  if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
 
+  const {userDataId} = req.body
+  if (!userDataId) return res.status(400).json({success: false, message: "Missing data"})
+  
+  try {
+    const [reqUser] = await db.query("select userRole from UserData where userDataId = ?", [req.session.user.id])
+
+    if (reqUser[0].userRole !== "owner") {
+      return res.status(403).json({success: false, message: "Only the owner can manage user roles"})
+    } 
+
+    try {
+      const [dbUser] = await db.query("select username, userRole from UserData where userDataId = ?", [userDataId])
+
+      if (dbUser.length === 0) return res.status(404).json({success: false, message: "User not found"})
+      if (dbUser[0].userRole === "owner") return res.status(403).json({success: false, message: "Can't change the owners role"})
+      if (dbUser[0].userRole !== "admin") return res.status(409).json({success: false, message: "User is not an admin"})
+      
+      try {
+        await db.query("update UserData set userRole = 'user' where userDataId = ?", [userDataId])
+
+        res.status(200).json({success: true, message: `Successfully demoted '${dbUser[0].username}' to user`})
+      } catch (error) {
+        console.error(error)
+        res.status(500).json({success: false, message: "Error while demoting user"})
+      }
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({success: false, message: "Error while retrieving the requested users userdata from the database"})
+    }
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({success: false, message: "Error while retrieving the requesting users userdata from the database"})
+  }
 }
 
 // approve a register request. Only accessible to admin and owner
@@ -256,7 +324,7 @@ export async function approveRegister(req, res) {
         res.status(200).json({success: true, message: `Successfully approved the register request of user '${dbUser[0].username}'`})
       } catch (error) {
         console.error(error)
-        res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
+        res.status(500).json({success: false, message: "Error while accepting register request"})
       }
     } catch (error) {
       console.error(error)
@@ -294,7 +362,7 @@ export async function denyRegister(req, res) {
         res.status(200).json({success: true, message: `Successfully denied and deleted the register request of user '${dbUser[0].username}'`})
       } catch (error) {
         console.error(error)
-        res.status(500).json({success: false, message: "Error while retrieving userdata from the database"})
+        res.status(500).json({success: false, message: "Error while denying register request"})
       }
     } catch (error) {
       console.error(error)

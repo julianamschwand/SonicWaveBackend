@@ -4,8 +4,8 @@ import cors from 'cors'
 import dotenv from "dotenv"
 import { existsSync } from 'fs'
 
-import { createSessionStore } from "./db.js"
-import { smtpVerifier, mailer } from './mailer.js'
+import { createSessionStore } from "./db/db.js"
+import { smtpVerifier } from './mailer.js'
 import setupWizard from './setup/setup.js'
 import * as userHandlers from './handlers/user-handlers.js'
 import * as songHandlers from './handlers/song-handlers.js'

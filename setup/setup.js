@@ -146,7 +146,7 @@ async function setupWizard() {
     })
   }
   
-  // asking for additional information
+  // asking for additional ENV information
   let nodeEnvAnswer = ""
   let nodeEnv = ""
 
@@ -173,6 +173,10 @@ async function setupWizard() {
   const smtpUser = await input.question("Enter your SMTP user: ")
   const smtpPass = await input.question("Enter your SMTP password: ")
 
+  // // asking for spotify app credentials for spotDL
+  // const spotifyClientId = input.question("Enter your spotify app client id: ")
+  // const spotifyClientSecret = input.question("Enter your spotify app client secret: ")
+
   // writing .env file
   console.log("Creating .env file ...")
 
@@ -188,10 +192,12 @@ async function setupWizard() {
   `SMTP_HOST="${smtpHost}"\n` +
   `SMTP_PORT="${smtpPort}"\n` +
   `SMTP_USER="${smtpUser}"\n` +
-  `SMTP_PASS="${smtpPass}"\n`
+  `SMTP_PASS="${smtpPass}"\n`/* +
+  `SPOTIFY_CLIENT_ID="${spotifyClientId}"\n` +
+  `SPOTIFY_CLIENT_SECRET="${spotifyClientSecret}"\n`*/
 
   for (const [key, value] of Object.entries(paths)) {
-    envContent += `\n${key.toUpperCase()}_PATH="${value}"`
+    envContent += `\n${key.toUpperCase()}_PATH='"${value}"'`
   }
 
   await writeFile("./.env", envContent, "utf-8")

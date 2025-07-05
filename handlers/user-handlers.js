@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt'
-import { db } from '../db.js'
+import { db } from '../db/db.js'
 import { mailer } from '../mailer.js'
 
 // get the userdata from a single user

@@ -1,4 +1,4 @@
-import { db } from '../db.js'
+import { db } from '../db/db.js'
 
 // make a new playlist
 export async function createPlaylist(req, res) {

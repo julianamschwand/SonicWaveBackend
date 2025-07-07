@@ -4,9 +4,10 @@ import cors from 'cors'
 import dotenv from "dotenv"
 import { existsSync } from 'fs'
 
+import setupWizard from './setup/setup.js'
 import { createSessionStore } from "./db/db.js"
 import { smtpVerifier } from './mailer.js'
-import setupWizard from './setup/setup.js'
+import { routeWrapper } from './error-handling.js'
 import * as userHandlers from './handlers/user-handlers.js'
 import * as songHandlers from './handlers/song-handlers.js'
 import * as playlistHandlers from './handlers/playlist-handlers.js'
@@ -49,19 +50,19 @@ await smtpVerifier()
 
 const userRouter = express.Router()
 
-userRouter.get("/userdata", userHandlers.userdata)
-userRouter.post("/register", userHandlers.register)
-userRouter.post("/login", userHandlers.login)
-userRouter.post("/logout", userHandlers.logout)
-userRouter.get("/login-state", userHandlers.loginState)
-userRouter.patch("/change-password", userHandlers.changePassword)
-userRouter.get("/send-otp", userHandlers.sendOTP)
-userRouter.delete("/delete-user", userHandlers.deleteUser)
-userRouter.patch("/make-admin", userHandlers.makeAdmin)
-userRouter.patch("/remove-admin", userHandlers.removeAdmin)
-userRouter.patch("/approve-register", userHandlers.approveRegister)
-userRouter.patch("/deny-register", userHandlers.denyRegister)
-userRouter.get("/register-requests", userHandlers.registerRequests)
+userRouter.get("/userdata", routeWrapper(userHandlers.userdata))
+userRouter.post("/register", routeWrapper(userHandlers.register))
+userRouter.post("/login", routeWrapper(userHandlers.login))
+userRouter.post("/logout", routeWrapper(userHandlers.logout))
+userRouter.get("/login-state", routeWrapper(userHandlers.loginState))
+userRouter.patch("/change-password", routeWrapper(userHandlers.changePassword))
+userRouter.get("/send-otp", routeWrapper(userHandlers.sendOTP))
+userRouter.delete("/delete-user", routeWrapper(userHandlers.deleteUser))
+userRouter.patch("/make-admin", routeWrapper(userHandlers.makeAdmin))
+userRouter.patch("/remove-admin", routeWrapper(userHandlers.removeAdmin))
+userRouter.patch("/approve-register", routeWrapper(userHandlers.approveRegister))
+userRouter.patch("/deny-register", routeWrapper(userHandlers.denyRegister))
+userRouter.get("/register-requests", routeWrapper(userHandlers.registerRequests))
 
 app.use("/users", userRouter)
 
@@ -69,14 +70,14 @@ app.use("/users", userRouter)
 
 const songRouter = express.Router()
 
-songRouter.get("/play-song", songHandlers.playSong)
-songRouter.post("/download-song", songHandlers.downloadSong)
-songRouter.get("/browse-songs", songHandlers.browseSongs)
-songRouter.get("/songs", songHandlers.songs)
-songRouter.patch("/edit-song", songHandlers.editSong)
-songRouter.delete("/delete-song", songHandlers.deleteSong)
-songRouter.post("/favorite-song", songHandlers.favoriteSong)
-songRouter.post("/unfavorite-song", songHandlers.unfavoriteSong)
+songRouter.get("/play-song", routeWrapper(songHandlers.playSong))
+songRouter.post("/download-song", routeWrapper(songHandlers.downloadSong))
+songRouter.get("/browse-songs", routeWrapper(songHandlers.browseSongs))
+songRouter.get("/songs", routeWrapper(songHandlers.songs))
+songRouter.patch("/edit-song", routeWrapper(songHandlers.editSong))
+songRouter.delete("/delete-song", routeWrapper(songHandlers.deleteSong))
+songRouter.post("/favorite-song", routeWrapper(songHandlers.favoriteSong))
+songRouter.post("/unfavorite-song", routeWrapper(songHandlers.unfavoriteSong))
 
 app.use("/songs", songRouter)
 
@@ -84,12 +85,12 @@ app.use("/songs", songRouter)
 
 const playlistRouter = express.Router()
 
-playlistRouter.post("/create-playlist", playlistHandlers.createPlaylist)
-playlistRouter.patch("/edit-playlist", playlistHandlers.editPlaylist)
-playlistRouter.delete("/delete-playlist", playlistHandlers.deletePlaylist)
-playlistRouter.post("/add-to-playlist", playlistHandlers.addToPlaylist)
-playlistRouter.delete("/all-playlists", playlistHandlers.allPlaylists)
-playlistRouter.get("/playlist", playlistHandlers.playlist)
+playlistRouter.post("/create-playlist", routeWrapper(playlistHandlers.createPlaylist))
+playlistRouter.patch("/edit-playlist", routeWrapper(playlistHandlers.editPlaylist))
+playlistRouter.delete("/delete-playlist", routeWrapper(playlistHandlers.deletePlaylist))
+playlistRouter.post("/add-to-playlist", routeWrapper(playlistHandlers.addToPlaylist))
+playlistRouter.delete("/all-playlists", routeWrapper(playlistHandlers.allPlaylists))
+playlistRouter.get("/playlist", routeWrapper(playlistHandlers.playlist))
 
 app.use("/playlists", playlistRouter)
 

@@ -60,7 +60,7 @@ async function setupWizard() {
 
     let setupScript = ""
     try {
-      setupScript = await readFile("./db-setup.sql", "utf-8");
+      setupScript = await readFile("./db/db-setup.sql", "utf-8");
     } catch (error) {
       console.error("Error while reading db-setup.sql")
     }

@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto'
 import { exec as execCb } from 'child_process'
 import { unlink } from 'fs/promises'
 import { db } from '../db/db.js'
+import { safeOperation, safeOperations, loggedIn, HttpError, checkReq } from '../error-handling.js'
 dotenv.config()
 
 const exec = util.promisify(execCb)
@@ -16,57 +17,66 @@ export async function playSong(req, res) {
 
 // download a song by URL
 export async function downloadSong(req, res) {
-  if (!req.session.user) return res.status(401).json({success: false, message: 'Unauthorized'})
+  loggedIn(req)
 
   const {songURL} = req.body
-  if (!songURL) return res.status(400).json({success: false, message: "Missing data"})
+  checkReq(!songURL)
 
-  try {
-    const filename = randomBytes(4).toString('hex') + ".mp3"
+  const filename = randomBytes(4).toString('hex') + ".mp3"
 
-    const {stderr} = await exec(process.env.YTDLP_PATH +
-                                        ` -x` +
-                                        ` --audio-format mp3` +
-                                        ` --audio-quality 0` +
-                                        ` --embed-metadata` +
-                                        ` --embed-thumbnail` +
-                                        ` --add-metadata` +
-                                        ` -o "./songs/${filename}"` +
-                                        ` "${songURL}"`)
+  const {stderr} = await safeOperation(
+    () => exec(process.env.YTDLP_PATH +
+              ` -x` +
+              ` --audio-format mp3` +
+              ` --audio-quality 0` +
+              ` --embed-metadata` +
+              ` --embed-thumbnail` +
+              ` --add-metadata` +
+              ` -o "./songs/${filename}"` +
+              ` "${songURL}"`),
+    "Error while downloading the song"
+  )
   
-    res.status(200).json({success: true, message: "Successfully downloaded the song and added it to account"})
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({success: false, message: "Error while downloading the song"})
-  }
+  res.status(200).json({success: true, message: "Successfully downloaded the song and added it to account"})
 }
 
 // browse songs with soundcloud
 export async function browseSongs(req, res) {
+  loggedIn(req)
+
   const {query} = req.query
-  if (!query) return res.status(400).json({success: false, message: "Missing data"})
+  checkReq(!query)
 
-  try {
-    const response = await axios.get(`https://soundcloud.com/search?q=${query}`);
+  const searchPage = await safeOperation(
+    () => axios.get(`https://soundcloud.com/search?q=${query}`),
+    "Error while getting search page"
+  )
 
-    const regex = /<h2><a href="(\/[^\/]+\/[^\/]+)">/g
-    const filtered = [...response.data.matchAll(regex)]
+  const regex = /<h2><a href="(\/[^\/]+\/[^\/]+)">/g
+  const filtered = [...searchPage.data.matchAll(regex)]
 
-    const structured = filtered.map(match => {
-      const splitMatch = match[1].split("/")
+  const structured = await Promise.all(
+    filtered.map(async match => {
+      const url = "https://soundcloud.com" + match[1]
+  
+      const songPage = await safeOperation(
+        () => axios.get(url),
+        "Error while getting song page"
+      )
+  
+      const image_url = /<img src="([^"]+)"/.exec(songPage.data)
       
+      const splitMatch = match[1].split("/")
       return {
         name: splitMatch[2][0].toUpperCase() + splitMatch[2].slice(1),
         artist: splitMatch[1][0].toUpperCase() + splitMatch[1].slice(1),
-        url: "https://soundcloud.com" + match[1]
+        url,
+        image_url: image_url[1]
       }
     })
+  )
 
-    res.status(200).json({success: true, message: "Successfully fetched songs", songs: structured})
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({success: false, message: "Error while browsing songs"})
-  }
+  res.status(200).json({success: true, message: "Successfully fetched songs", songs: structured})
 }
 
 // get all songs with optional filters

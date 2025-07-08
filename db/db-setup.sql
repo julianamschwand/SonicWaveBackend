@@ -23,12 +23,12 @@ create table Artists (
 
 create table Songs (
   songId int primary key auto_increment,
-  songFileName char(12),
+  songFileName char(36) unique,
   title varchar(50),
   genre varchar(20),
   duration int,
   releaseYear int,
-  isFavorite boolean,
+  isFavorite boolean default false,
   lastPlayed timestamp,
   fk_UserDataId int,
   fk_ArtistId int,
@@ -47,7 +47,7 @@ create table PlaylistSongs (
 create table OneTimePasswords (
   otpId int primary key auto_increment,
   otp char(6),
-  attemptsRemaining int default(3),
+  attemptsRemaining int default 3,
   fk_UserDataId int,
   foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
 );

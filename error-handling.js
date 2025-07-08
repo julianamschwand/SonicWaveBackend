@@ -11,9 +11,13 @@ export function routeWrapper(handler) {
     try {
       await handler(req, res, next)
     } catch (error) {
-      if (!(error instanceof HttpError)) console.error("Error", error)
-      if (error.json) res.status(error.status || 500).json({success: false, message: error.message, ...error.json})
-      else res.status(error.status || 500).json({success: false, message: error.message})
+      if (!(error instanceof HttpError)) {
+        console.error("Error", error)
+        res.status(500).json({success: false, message: "Unhandled error"})
+      } else {
+        if (error.json) res.status(error.status || 500).json({success: false, message: error.message, ...error.json})
+        else res.status(error.status || 500).json({success: false, message: error.message})
+      }
     }
   }
 }
@@ -41,10 +45,6 @@ export async function safeOperations(operations, message, failOperation) {
     }
   }
   return results
-}
-
-export function loggedIn(req) {
-  if (!req.session.user) throw new HttpError("Unauthorized", 401)
 }
 
 export function checkReq(condition) {

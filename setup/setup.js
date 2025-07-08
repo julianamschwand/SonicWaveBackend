@@ -20,6 +20,11 @@ async function setupWizard() {
     process.exit(0)
   }
 
+  // creating folders
+  await mkdir("./bin", { recursive: true })
+  await mkdir("./songs/audio", { recursive: true })
+  await mkdir("./songs/cover", { recursive: true })
+
   // ask for db credentials
   const rootPass = await input.question("Enter your MariaDB / MySQL root password: ")
   const dbHost = await input.question("Enter your database host: ")
@@ -72,6 +77,7 @@ async function setupWizard() {
       create database SonicWave;
       use SonicWave;
       ${setupScript}
+      insert into Artists (artistName, artistDescription) values ('Unknown','Unknown artist');
       drop user if exists 'SonicWaveUser'@'localhost';
       create user 'SonicWaveUser'@'${dbHost}' identified by '${userPass}';
       grant all privileges on SonicWave.* to 'SonicWaveUser'@'${dbHost}';
@@ -112,8 +118,6 @@ async function setupWizard() {
     linux_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-linux", "spotdl-4.2.11-linux"],
     darwin_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-darwin", "spotdl-4.2.11-darwin"],
   }
-
-  await mkdir("./bin", { recursive: true })
 
   for (const download of downloads) {
     const key = `${os}_${download}`

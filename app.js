@@ -30,6 +30,7 @@ const sessionStore = createSessionStore()
 
 const isProd = process.env.NODE_ENV == "production"
 
+// express session config
 app.use(session({
   key: "SessionId",
   secret: process.env.SESSION_SECRET,
@@ -44,25 +45,33 @@ app.use(session({
   }
 }))
 
+// auth middleware
+function checkAuth(req, res, next) {
+ if (!req.session.user) {
+    return res.status(401).json({success: false, message: "Not logged in"})
+  }
+  next()
+}
+
 await smtpVerifier()
 
 // user routes
 
 const userRouter = express.Router()
 
-userRouter.get("/userdata", routeWrapper(userHandlers.userdata))
+userRouter.get("/userdata", checkAuth, routeWrapper(userHandlers.userdata))
 userRouter.post("/register", routeWrapper(userHandlers.register))
 userRouter.post("/login", routeWrapper(userHandlers.login))
-userRouter.post("/logout", routeWrapper(userHandlers.logout))
+userRouter.post("/logout", checkAuth, routeWrapper(userHandlers.logout))
 userRouter.get("/login-state", routeWrapper(userHandlers.loginState))
 userRouter.patch("/change-password", routeWrapper(userHandlers.changePassword))
 userRouter.get("/send-otp", routeWrapper(userHandlers.sendOTP))
-userRouter.delete("/delete-user", routeWrapper(userHandlers.deleteUser))
-userRouter.patch("/make-admin", routeWrapper(userHandlers.makeAdmin))
-userRouter.patch("/remove-admin", routeWrapper(userHandlers.removeAdmin))
-userRouter.patch("/approve-register", routeWrapper(userHandlers.approveRegister))
-userRouter.patch("/deny-register", routeWrapper(userHandlers.denyRegister))
-userRouter.get("/register-requests", routeWrapper(userHandlers.registerRequests))
+userRouter.delete("/delete-user", checkAuth, routeWrapper(userHandlers.deleteUser))
+userRouter.patch("/make-admin", checkAuth, routeWrapper(userHandlers.makeAdmin))
+userRouter.patch("/remove-admin", checkAuth, routeWrapper(userHandlers.removeAdmin))
+userRouter.patch("/approve-register", checkAuth, routeWrapper(userHandlers.approveRegister))
+userRouter.patch("/deny-register", checkAuth, routeWrapper(userHandlers.denyRegister))
+userRouter.get("/register-requests", checkAuth, routeWrapper(userHandlers.registerRequests))
 
 app.use("/users", userRouter)
 
@@ -70,14 +79,15 @@ app.use("/users", userRouter)
 
 const songRouter = express.Router()
 
-songRouter.get("/play-song", routeWrapper(songHandlers.playSong))
-songRouter.post("/download-song", routeWrapper(songHandlers.downloadSong))
-songRouter.get("/browse-songs", routeWrapper(songHandlers.browseSongs))
-songRouter.get("/songs", routeWrapper(songHandlers.songs))
-songRouter.patch("/edit-song", routeWrapper(songHandlers.editSong))
-songRouter.delete("/delete-song", routeWrapper(songHandlers.deleteSong))
-songRouter.post("/favorite-song", routeWrapper(songHandlers.favoriteSong))
-songRouter.post("/unfavorite-song", routeWrapper(songHandlers.unfavoriteSong))
+songRouter.get("/play-song", checkAuth, routeWrapper(songHandlers.playSong))
+songRouter.post("/download-song", checkAuth, routeWrapper(songHandlers.downloadSong))
+songRouter.get("/browse-songs", checkAuth, routeWrapper(songHandlers.browseSongs))
+songRouter.get("/songs", checkAuth, routeWrapper(songHandlers.songs))
+songRouter.get("/cover/:filename", checkAuth, routeWrapper(songHandlers.getCover))
+songRouter.patch("/edit-song", checkAuth, routeWrapper(songHandlers.editSong))
+songRouter.delete("/delete-song", checkAuth, routeWrapper(songHandlers.deleteSong))
+songRouter.post("/favorite-song", checkAuth, routeWrapper(songHandlers.favoriteSong))
+songRouter.post("/unfavorite-song", checkAuth, routeWrapper(songHandlers.unfavoriteSong))
 
 app.use("/songs", songRouter)
 
@@ -85,12 +95,12 @@ app.use("/songs", songRouter)
 
 const playlistRouter = express.Router()
 
-playlistRouter.post("/create-playlist", routeWrapper(playlistHandlers.createPlaylist))
-playlistRouter.patch("/edit-playlist", routeWrapper(playlistHandlers.editPlaylist))
-playlistRouter.delete("/delete-playlist", routeWrapper(playlistHandlers.deletePlaylist))
-playlistRouter.post("/add-to-playlist", routeWrapper(playlistHandlers.addToPlaylist))
-playlistRouter.delete("/all-playlists", routeWrapper(playlistHandlers.allPlaylists))
-playlistRouter.get("/playlist", routeWrapper(playlistHandlers.playlist))
+playlistRouter.post("/create-playlist", checkAuth, routeWrapper(playlistHandlers.createPlaylist))
+playlistRouter.patch("/edit-playlist", checkAuth, routeWrapper(playlistHandlers.editPlaylist))
+playlistRouter.delete("/delete-playlist", checkAuth, routeWrapper(playlistHandlers.deletePlaylist))
+playlistRouter.post("/add-to-playlist", checkAuth, routeWrapper(playlistHandlers.addToPlaylist))
+playlistRouter.delete("/all-playlists", checkAuth, routeWrapper(playlistHandlers.allPlaylists))
+playlistRouter.get("/playlist", checkAuth, routeWrapper(playlistHandlers.playlist))
 
 app.use("/playlists", playlistRouter)
 

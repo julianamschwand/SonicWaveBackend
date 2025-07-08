@@ -1,12 +1,10 @@
 import bcrypt from 'bcrypt'
 import { db } from '../db/db.js'
 import { mailer } from '../mailer.js'
-import { safeOperation, safeOperations, loggedIn, HttpError, checkReq } from '../error-handling.js'
+import { safeOperation, safeOperations, HttpError, checkReq } from '../error-handling.js'
 
 // get the userdata from a single user
 export async function userdata(req, res) { 
-  loggedIn(req)
-
   const user = await safeOperation( 
     () => db.query("select username, email, userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving userdata from the database"
@@ -67,8 +65,6 @@ export async function login(req, res) {
 
 // logout a user
 export async function logout(req, res) {
-  loggedIn(req)
-
   req.session.destroy()
   res.clearCookie('SessionId')
   res.status(200).json({success: true, message: 'Logged out successfully'})
@@ -178,8 +174,6 @@ export async function sendOTP(req, res) {
 
 // delete a user. Only accessible to admin, owner or the user to be deleted
 export async function deleteUser(req, res) {
-  loggedIn(req)
-
   const {userDataId} = req.body
   checkReq(!userDataId)
   
@@ -203,8 +197,6 @@ export async function deleteUser(req, res) {
 
 // promote a user to admin. Only accessible to owner
 export async function makeAdmin(req, res) {
-  loggedIn(req)
-
   const {userDataId} = req.body
   checkReq(!userDataId)
   
@@ -234,8 +226,6 @@ export async function makeAdmin(req, res) {
 
 // demote an admin to user. Only accessible by owner
 export async function removeAdmin(req, res) {
-  loggedIn(req)
-
   const {userDataId} = req.body
   checkReq(!userDataId)
   
@@ -266,8 +256,6 @@ export async function removeAdmin(req, res) {
 
 // approve a register request. Only accessible to admin and owner
 export async function approveRegister(req, res) {
-  loggedIn(req)
-
   const {userDataId} = req.body
   checkReq(!userDataId)
 
@@ -296,8 +284,6 @@ export async function approveRegister(req, res) {
 
 // deny a register request. Only accessible to admin and owner
 export async function denyRegister(req, res) {
-  loggedIn(req)
-
   const {userDataId} = req.body
   checkReq(!userDataId)
   
@@ -326,8 +312,6 @@ export async function denyRegister(req, res) {
 
 // get all register requests. Only accessible by admin and owner
 export async function registerRequests(req, res) {
-  loggedIn(req)
-
   const [reqUser] = await safeOperation(
     () => db.query("select userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving userdata from the database"

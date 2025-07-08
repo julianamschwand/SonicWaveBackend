@@ -1,14 +1,18 @@
 import util from 'util'
 import dotenv from 'dotenv'
 import axios from 'axios'
-import { randomBytes } from 'crypto'
+import sharp from 'sharp'
+import { randomUUID } from 'crypto'
 import { exec as execCb } from 'child_process'
-import { unlink } from 'fs/promises'
+import { parseFile } from 'music-metadata'
+import { unlink, writeFile, access } from 'fs/promises'
 import { db } from '../db/db.js'
-import { safeOperation, safeOperations, loggedIn, HttpError, checkReq } from '../error-handling.js'
+import { safeOperation, safeOperations, HttpError, checkReq } from '../error-handling.js'
 dotenv.config()
 
 const exec = util.promisify(execCb)
+
+
 
 // play a downloaded song
 export async function playSong(req, res) {
@@ -17,24 +21,66 @@ export async function playSong(req, res) {
 
 // download a song by URL
 export async function downloadSong(req, res) {
-  loggedIn(req)
-
   const {songURL} = req.body
   checkReq(!songURL)
 
-  const filename = randomBytes(4).toString('hex') + ".mp3"
+  const filename = randomUUID()
+  const songpath = `./songs/audio/${filename}.m4a`
 
   const {stderr} = await safeOperation(
     () => exec(process.env.YTDLP_PATH +
               ` -x` +
-              ` --audio-format mp3` +
+              ` --audio-format m4a` +
               ` --audio-quality 0` +
               ` --embed-metadata` +
               ` --embed-thumbnail` +
               ` --add-metadata` +
-              ` -o "./songs/${filename}"` +
+              ` -o "${songpath}"` +
               ` "${songURL}"`),
     "Error while downloading the song"
+  )
+
+  if (stderr) console.warn('yt-dlp stderr:', stderr)
+
+  const metadata = await safeOperation(
+    () => parseFile(`${songpath}`),
+    "Error while reading metadata"
+  )
+
+  const common = metadata.common
+  const format = metadata.format
+
+  let artistId = 0
+  if (common.artist) {
+    const [dbArtist] = await safeOperation(
+      () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [common.artist]),
+      "Error while selecting artist from the database"
+    )
+
+    if (dbArtist.length === 0) {
+      const [artistResult] = await safeOperation(
+        () => db.query("insert into Artists (artistName) values (?)", [common.artist]),
+        "Error while inserting new artist"
+      )
+      artistId = artistResult.insertId
+    } else {
+      artistId = dbArtist[0].artistId
+    }
+  } else {
+    artistId = 1
+  }
+
+  if (metadata.common.picture && metadata.common.picture.length > 0) {
+    const cover = common.picture[0]
+    const convertedCover = await sharp(cover.data).jpeg().toBuffer()
+    await writeFile(`./songs/cover/${filename}.jpg}`, convertedCover)
+  }
+
+  await safeOperation(
+    () => db.query(`insert into Songs (songFileName, title, genre, duration, releaseYear, fk_UserDataId, fk_ArtistId)
+                    values (?,?,?,?,?,?,?)`,
+                    [filename, common.title, common.genre, format.duration, common.year, req.session.user.id, artistId]),
+    "Error while saving Songdata to database"
   )
   
   res.status(200).json({success: true, message: "Successfully downloaded the song and added it to account"})
@@ -42,8 +88,6 @@ export async function downloadSong(req, res) {
 
 // browse songs with soundcloud
 export async function browseSongs(req, res) {
-  loggedIn(req)
-
   const {query} = req.query
   checkReq(!query)
 
@@ -82,6 +126,21 @@ export async function browseSongs(req, res) {
 // get all songs with optional filters
 export async function songs(req, res) {
 
+}
+
+// get cover image
+export async function getCover(req, res) {
+  const filename = req.params.filename
+
+  const [dbUser] = await safeOperation(
+    () => db.query("select fk_UserDataId from Songs where songFileName = ?", [filename.slice(0, -4)]),
+    "Error while checking the covers owner"
+  )
+
+  if (dbUser.length === 0) return res.status(404).json({success: false, message: "Cover not found"})
+  if (dbUser[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
+  
+  res.status(200).sendFile(`${process.cwd()}/songs/cover/${filename}`)
 }
 
 // edit an existing songs metadata

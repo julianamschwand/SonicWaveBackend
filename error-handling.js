@@ -27,7 +27,10 @@ export async function safeOperation(operation, message, failOperation) {
     return await operation()
   } catch (error) {
     if (failOperation) await failOperation()
-    if (!(error instanceof HttpError)) throw new HttpError(message, 500)
+    if (!(error instanceof HttpError)) {
+      console.error(error)
+      throw new HttpError(message, 500)
+    }
     else throw error
   }
 }

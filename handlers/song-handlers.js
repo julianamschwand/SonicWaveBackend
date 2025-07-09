@@ -26,10 +26,11 @@ export async function downloadSong(req, res) {
   const songpath = `./songs/audio/${filename}.m4a`
 
   const {stderr} = await safeOperation(
-    () => exec(process.env.YTDLP_PATH +
+    () => exec(`"${process.env.YTDLP_PATH}"` +
               ` -x` +
               ` --audio-format m4a` +
               ` --audio-quality 0` +
+              ` --ffmpeg-location ${process.env.FFMPEG_PATH}` +
               ` --embed-metadata` +
               ` --embed-thumbnail` +
               ` --add-metadata` +
@@ -121,9 +122,31 @@ export async function browseSongs(req, res) {
   res.status(200).json({success: true, message: "Successfully fetched songs", songs: structured})
 }
 
-// get all songs with optional filters
+// get all songs
 export async function songs(req, res) {
+  const [songs] = await safeOperation(
+    () => db.query(`select songId, title, artistName, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName from Songs
+                    join Artists on fk_ArtistId = artistId`, [req.session.user.id]),
+    "Error while fetching songs from database"
+  )
 
+  const formattedSongs = songs.map(song => {
+    const coverUrl = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
+
+    return {
+      songId: song.songId,
+      title: song.title,
+      artist: song.artistName,
+      genre: song.genre,
+      duration: song.duration,
+      releaseYear: song.releaseYear,
+      isFavorite: Boolean(song.isFavorite),
+      lastPlayed: song.lastPlayed,
+      cover: coverUrl
+    }
+  })
+
+  res.status(200).json({success: false, message: "Successfully retrieved songs from database", songs: formattedSongs})
 }
 
 // get cover image

@@ -235,7 +235,7 @@ async function setupWizard() {
   `SPOTIFY_CLIENT_SECRET="${spotifyClientSecret}"\n`*/
 
   for (const [key, value] of Object.entries(paths)) {
-    envContent += `\n${key.toUpperCase()}_PATH='"${value}${key === "ffmpeg" ? "/bin" : ""}"'`
+    envContent += `\n${key.toUpperCase()}_PATH="${value}${key === "ffmpeg" ? "/bin" : ""}"`
   }
 
   await writeFile("./.env", envContent, "utf-8")

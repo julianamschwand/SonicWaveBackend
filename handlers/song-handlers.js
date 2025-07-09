@@ -12,8 +12,6 @@ dotenv.config()
 
 const exec = util.promisify(execCb)
 
-
-
 // play a downloaded song
 export async function playSong(req, res) {
 
@@ -73,7 +71,7 @@ export async function downloadSong(req, res) {
   if (metadata.common.picture && metadata.common.picture.length > 0) {
     const cover = common.picture[0]
     const convertedCover = await sharp(cover.data).jpeg().toBuffer()
-    await writeFile(`./songs/cover/${filename}.jpg}`, convertedCover)
+    await writeFile(`./songs/cover/${filename}.jpg`, convertedCover)
   }
 
   await safeOperation(

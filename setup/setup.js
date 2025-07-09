@@ -1,13 +1,23 @@
 import axios from 'axios'
 import bcrypt from 'bcrypt'
+import AdmZip from 'adm-zip'
+import { extract } from 'tar'
 import { promises as readlinePromises} from 'readline' 
 import { queryRootDB } from './root-db.js'
 import { randomBytes } from 'crypto'
 import { platform } from 'os'
-import { createWriteStream } from 'fs'
-import { chmod, mkdir, writeFile, readFile } from 'fs/promises'
+import { createWriteStream, existsSync } from 'fs'
+import { chmod, mkdir, writeFile, readFile, rename, rm, access } from 'fs/promises'
 
 async function setupWizard() {
+  // checking os
+  const os = platform()
+
+  if (os !== "linux" && os !== "win32" && os !== "darwin") {
+    console.warn("Unsupported os")
+    process.exit(0)
+  }
+
   // get root password for mariadb
   const input = readlinePromises.createInterface({
     input: process.stdin,
@@ -61,6 +71,13 @@ async function setupWizard() {
   let userPass = ""
 
   if (createDB) {
+    // asking for website owner credentials
+    const ownerName = await input.question("Enter the name for the website owner: ")
+    const ownerEmail = await input.question("Enter the email for the website owner: ")
+    const ownerPassword = await input.question("Enter the password for the website owner: ")
+
+    const hashedOwnerPassword = await bcrypt.hash(ownerPassword, 10)
+
     console.log("Setting up database ...")
 
     let setupScript = ""
@@ -77,6 +94,8 @@ async function setupWizard() {
       create database SonicWave;
       use SonicWave;
       ${setupScript}
+      insert into UserData (username, email, passwordHash, userRole, approved) 
+      values ('${ownerName}','${ownerEmail}','${hashedOwnerPassword}','owner',true);
       insert into Artists (artistName, artistDescription) values ('Unknown','Unknown artist');
       drop user if exists 'SonicWaveUser'@'localhost';
       create user 'SonicWaveUser'@'${dbHost}' identified by '${userPass}';
@@ -89,40 +108,29 @@ async function setupWizard() {
     userPass = await input.question("Password for database user: ")
   }
 
-  // create the website owner
-  const ownerName = await input.question("Enter the name for the website owner: ")
-  const ownerEmail = await input.question("Enter the email for the website owner: ")
-  const ownerPassword = await input.question("Enter the password for the website owner: ")
-
-  const hashedOwnerPassword = await bcrypt.hash(ownerPassword, 10)
-
-  await queryRootDB(rootPass, dbHost,
-    `use SonicWave;
-    insert into UserData (username, email, passwordHash, userRole, approved) 
-    values ('${ownerName}','${ownerEmail}','${hashedOwnerPassword}','owner',true);`
-  )
-
-  console.log("Successfully created owner")
-
-  // yt-dlp and spotDL download
-  const os = platform()
-
-  const downloads = ["ytdlp", "spotdl"]
+  // yt-dlp, spotDL and ffmpeg download
+  const downloads = ["ytdlp", "spotdl", "ffmpeg"]
   const paths = {}
 
   const urls = {
-    win32_ytdlp: ["https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe", "yt-dlp.exe"],
+    win32_ytdlp: ["https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe", "yt-dlp_win32.exe"],
     linux_ytdlp: ["https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux", "yt-dlp_linux"],
     darwin_ytdlp: ["https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos", "yt-dlp_macos"],
-    win32_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-win32.exe", "spotdl-4.2.11-win32.exe"],
-    linux_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-linux", "spotdl-4.2.11-linux"],
-    darwin_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-darwin", "spotdl-4.2.11-darwin"],
+    win32_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-win32.exe", "spotdl_win32.exe"],
+    linux_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-linux", "spotdl_linux"],
+    darwin_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-darwin", "spotdl_darwin"],
+    win32_ffmpeg: ["https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-7.1.zip", "ffmpeg_win32"],
+    linux_ffmpeg: ["https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-linux64-gpl-7.1.tar.xz", "ffmpeg_linux"],
+    darwin_ffmpeg: ["https://evermeet.cx/ffmpeg/get/zip", "ffmpeg_macos"]
   }
 
   for (const download of downloads) {
     const key = `${os}_${download}`
 
     const [url, filename] = urls[key]
+    const downloadname = url.split("/").pop()
+    const downloadpath = `./bin/${downloadname}`
+    console.log(downloadname)
 
     if (!url) {
       console.warn(`No binary available for ${download} on ${os}. This will break base functionality`)
@@ -133,7 +141,7 @@ async function setupWizard() {
     
     console.log(`Downloading ${download} ...`)
 
-    const file = createWriteStream(`./bin/${filename}`)
+    const file = createWriteStream(downloadpath)
     const response = await axios.get(url, { responseType: "stream" })
     response.data.pipe(file)
 
@@ -141,13 +149,39 @@ async function setupWizard() {
       file.on("finish", async () => {
         file.close()
         if (os !== "win32") {
-          await chmod(`./bin/${filename}`, 0o755)
+          await chmod(downloadpath, 0o755)
         }
         console.log("Successfully downloaded " + download)
         resolve()
       })
       file.on("error", reject)
     })
+
+    const filenameSplit = downloadname.split(".")
+    if (filenameSplit.length > 1) {
+      const fileSuffix = filenameSplit[filenameSplit.length - 1]
+      if (fileSuffix === "zip") {
+        console.log("extract")
+        const zip = new AdmZip(downloadpath)
+        zip.extractAllTo("./bin/", true)
+        await rm(downloadpath)
+        await rename(downloadpath.slice(0, -4), `./bin/${filename}`)
+      } else if (fileSuffix === "xz") {
+        await extract({
+          file: downloadpath,
+          C: "./bin/"
+        })
+        await rm(downloadpath)
+        await rename(downloadpath.slice(0, -7), `./bin/${filename}`)
+      }
+    }
+
+    try {
+      await access(downloadpath)
+      await rename(downloadpath, `./bin/${filename}`)
+    } catch (error) {
+      continue
+    }
   }
   
   // asking for additional ENV information
@@ -201,17 +235,14 @@ async function setupWizard() {
   `SPOTIFY_CLIENT_SECRET="${spotifyClientSecret}"\n`*/
 
   for (const [key, value] of Object.entries(paths)) {
-    envContent += `\n${key.toUpperCase()}_PATH='"${value}"'`
+    envContent += `\n${key.toUpperCase()}_PATH='"${value}${key === "ffmpeg" ? "/bin" : ""}"'`
   }
 
   await writeFile("./.env", envContent, "utf-8")
 
   console.log("Successfully created .env file")
-
   input.close()
-
   console.log("\nSetup complete! Restart the program")
-
   process.exit(0)
 }
 

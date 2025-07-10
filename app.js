@@ -86,8 +86,7 @@ songRouter.get("/songs", checkAuth, routeWrapper(songHandlers.songs))
 songRouter.get("/cover/:filename", checkAuth, routeWrapper(songHandlers.getCover))
 songRouter.patch("/edit-song", checkAuth, routeWrapper(songHandlers.editSong))
 songRouter.delete("/delete-song", checkAuth, routeWrapper(songHandlers.deleteSong))
-songRouter.post("/favorite-song", checkAuth, routeWrapper(songHandlers.favoriteSong))
-songRouter.post("/unfavorite-song", checkAuth, routeWrapper(songHandlers.unfavoriteSong))
+songRouter.post("/toggle-favorite", checkAuth, routeWrapper(songHandlers.toggleFavorite))
 
 app.use("/songs", songRouter)
 

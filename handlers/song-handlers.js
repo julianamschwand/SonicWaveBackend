@@ -172,6 +172,7 @@ export async function editSong(req, res) {
 // delete a song
 export async function deleteSong(req, res) {
   const {songId} = req.body
+  checkReq(!songId)
 
   const [dbSong] = await safeOperation(
     () => db.query("select fk_UserDataId, songFileName from Songs where songId = ?", [songId]),
@@ -194,12 +195,24 @@ export async function deleteSong(req, res) {
   res.status(200).json({success: true, message: "Successfully deleted the song"})
 }
 
-// add a song to favorites
-export async function favoriteSong(req, res) {
+// toggle favorite for a song
+export async function toggleFavorite(req, res) {
+  const {songId} = req.body
+  checkReq(!songId)
 
-}
+  const [dbSong] = await safeOperation(
+    () => db.query("select fk_UserDataId, isFavorite from Songs where songId = ?", [songId]),
+    "Error while fetching song owner"
+  )
 
-// remove a song from favorites
-export async function unfavoriteSong(req, res) {
+  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
+  const setValue = !Boolean(dbSong[0].isFavorite)
+  await safeOperation(
+    () => db.query("update Songs set isFavorite = ? where songId = ?", [setValue, songId]),
+    "Error while toggling favorite on song"
+  )
+
+  res.status(200).json({success: true, message: "Successfully toggled favorite on the song"})
 }

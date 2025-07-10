@@ -171,7 +171,27 @@ export async function editSong(req, res) {
 
 // delete a song
 export async function deleteSong(req, res) {
+  const {songId} = req.body
 
+  const [dbSong] = await safeOperation(
+    () => db.query("select fk_UserDataId, songFileName from Songs where songId = ?", [songId]),
+    "Error while fetching song owner"
+  )
+
+  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  
+  await safeOperations([
+    () => unlink(`./songs/audio/${dbSong[0].songFileName}.m4a`),
+    () => unlink(`./songs/cover/${dbSong[0].songFileName}.jpg`)
+  ], "Error while deleting song files")
+
+  await safeOperation(
+    () => db.query("delete from Songs where songId = ?", [songId]),
+    "Error while deleting song database entry"
+  )
+
+  res.status(200).json({success: true, message: "Successfully deleted the song"})
 }
 
 // add a song to favorites

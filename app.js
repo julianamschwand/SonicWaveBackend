@@ -2,7 +2,9 @@ import express from 'express'
 import session from 'express-session'
 import cors from 'cors'
 import dotenv from "dotenv"
+import formidable from 'formidable'
 import { existsSync } from 'fs'
+import { unlink } from 'fs/promises'
 
 import setupWizard from './setup/setup.js'
 import { createSessionStore } from "./db/db.js"
@@ -45,6 +47,44 @@ app.use(session({
   }
 }))
 
+// upload middleware
+function upload(uploadDir) {
+  return async function handleUpload(req, res, next) {
+    const form = formidable({
+      uploadDir: uploadDir,
+      keepExtensions: true,
+      maxFileSize: 10 * 1024 * 1024
+    })
+
+    try {
+      const [fields, files] = await form.parse(req)
+
+      req.body = fields
+      req.files = files
+      next()
+    } catch (error) {
+      next(error)
+    }
+  } 
+}
+
+// upload cleanup
+app.use(async (req, res, next) => {
+  res.on("finish", () => {
+    if (req.files) {
+      for (const files of Object.values(req.files)) {
+        for (const file of files) {
+          unlink(file.filepath).catch(error => {
+            console.error("Failed to delete file:", error)
+          })
+        }
+      }
+    }
+  })
+
+  next()
+})
+
 // auth middleware
 function checkAuth(req, res, next) {
  if (!req.session.user) {
@@ -84,7 +124,7 @@ songRouter.post("/download-song", checkAuth, routeWrapper(songHandlers.downloadS
 songRouter.get("/browse-songs", checkAuth, routeWrapper(songHandlers.browseSongs))
 songRouter.get("/songs", checkAuth, routeWrapper(songHandlers.songs))
 songRouter.get("/cover/:filename", checkAuth, routeWrapper(songHandlers.getCover))
-songRouter.patch("/edit-song", checkAuth, routeWrapper(songHandlers.editSong))
+songRouter.patch("/edit-song", checkAuth, upload('./songs/cover'), routeWrapper(songHandlers.editSong))
 songRouter.delete("/delete-song", checkAuth, routeWrapper(songHandlers.deleteSong))
 songRouter.post("/toggle-favorite", checkAuth, routeWrapper(songHandlers.toggleFavorite))
 
@@ -104,5 +144,4 @@ playlistRouter.get("/playlist", checkAuth, routeWrapper(playlistHandlers.playlis
 app.use("/playlists", playlistRouter)
 
 const port = process.env.PORT
-
 app.listen(port, () => console.log(`Server running on port ${port}`))

@@ -166,7 +166,45 @@ export async function getCover(req, res) {
 
 // edit an existing songs metadata
 export async function editSong(req, res) {
+  const {songId, title, artist, genre, releaseYear} = req.body
+  const cover = req.files.cover
+  checkReq(!songId)
 
+  const [dbSong] = await safeOperation(
+    () => db.query("select songFileName, fk_UserDataId from Songs where songId = ?", [songId]),
+    "Error while fetching song from database"
+  )
+
+  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+
+  await safeOperation(
+    async () => {
+      if (title) await db.query("update Songs set title = ? where songId = ?", [title, songId])
+      if (genre) await db.query("update Songs set genre = ? where songId = ?", [genre, songId])
+      if (releaseYear) await db.query("update Songs set releaseYear = ? where songId = ?", [releaseYear, songId])
+      if (artist) {
+        let artistId = 0
+        const [dbArtist] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
+        if (dbArtist.length === 0) {
+          const [artistResult] = await db.query("insert into Artists (artistName) values (?)", [artist])
+          artistId = artistResult.insertId
+        } else {
+          artistId = dbArtist[0].artistId
+        }
+        await db.query("update Songs set fk_ArtistId = ? where songId = ?", [artistId, songId])
+      }
+      if (cover) {
+        const coverFilepath = `./songs/cover/${dbSong[0].songFileName}.jpg`
+
+        await unlink(coverFilepath)
+        await sharp(cover[0].filepath).jpeg().toFile(coverFilepath)
+      }
+    },
+    "Error while updating song metadata"
+  )
+
+  res.status(200).json({success: true, message: "Successfully edited the song"})
 }
 
 // delete a song

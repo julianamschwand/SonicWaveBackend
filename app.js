@@ -136,7 +136,7 @@ app.use("/songs", songRouter)
 const playlistRouter = express.Router()
 
 playlistRouter.post("/create-playlist", checkAuth, upload("./playlist-covers"), routeWrapper(playlistHandlers.createPlaylist))
-playlistRouter.patch("/edit-playlist", checkAuth, routeWrapper(playlistHandlers.editPlaylist))
+playlistRouter.patch("/edit-playlist", checkAuth, upload("./playlist-covers"), routeWrapper(playlistHandlers.editPlaylist))
 playlistRouter.delete("/delete-playlist", checkAuth, routeWrapper(playlistHandlers.deletePlaylist))
 playlistRouter.post("/add-to-playlist", checkAuth, routeWrapper(playlistHandlers.addToPlaylist))
 playlistRouter.delete("/all-playlists", checkAuth, routeWrapper(playlistHandlers.allPlaylists))

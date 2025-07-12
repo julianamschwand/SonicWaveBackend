@@ -11,6 +11,7 @@ create table Playlists (
   playlistId int primary key auto_increment,
   playlistName varchar(20),
   playlistDescription text,
+  playlistCoverFileName char(36),
   fk_UserDataId int,
   foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
 );

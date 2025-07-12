@@ -124,7 +124,7 @@ songRouter.post("/download-song", checkAuth, routeWrapper(songHandlers.downloadS
 songRouter.get("/browse-songs", checkAuth, routeWrapper(songHandlers.browseSongs))
 songRouter.get("/songs", checkAuth, routeWrapper(songHandlers.songs))
 songRouter.get("/cover/:filename", checkAuth, routeWrapper(songHandlers.getCover))
-songRouter.patch("/edit-song", checkAuth, upload('./songs/cover'), routeWrapper(songHandlers.editSong))
+songRouter.patch("/edit-song", checkAuth, upload("./songs/cover"), routeWrapper(songHandlers.editSong))
 songRouter.delete("/delete-song", checkAuth, routeWrapper(songHandlers.deleteSong))
 songRouter.post("/toggle-favorite", checkAuth, routeWrapper(songHandlers.toggleFavorite))
 songRouter.put("/reset-song", checkAuth, routeWrapper(songHandlers.resetSong))
@@ -135,7 +135,7 @@ app.use("/songs", songRouter)
 
 const playlistRouter = express.Router()
 
-playlistRouter.post("/create-playlist", checkAuth, routeWrapper(playlistHandlers.createPlaylist))
+playlistRouter.post("/create-playlist", checkAuth, upload("./playlist-covers"), routeWrapper(playlistHandlers.createPlaylist))
 playlistRouter.patch("/edit-playlist", checkAuth, routeWrapper(playlistHandlers.editPlaylist))
 playlistRouter.delete("/delete-playlist", checkAuth, routeWrapper(playlistHandlers.deletePlaylist))
 playlistRouter.post("/add-to-playlist", checkAuth, routeWrapper(playlistHandlers.addToPlaylist))

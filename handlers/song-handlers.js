@@ -42,7 +42,7 @@ export async function downloadSong(req, res) {
   if (stderr) console.warn('yt-dlp stderr:', stderr)
 
   const metadata = await safeOperation(
-    () => parseFile(`${songpath}`),
+    () => parseFile(songpath),
     "Error while reading metadata"
   )
 
@@ -146,7 +146,7 @@ export async function songs(req, res) {
     }
   })
 
-  res.status(200).json({success: false, message: "Successfully retrieved songs from database", songs: formattedSongs})
+  res.status(200).json({success: true, message: "Successfully retrieved songs from database", songs: formattedSongs})
 }
 
 // get cover image
@@ -254,3 +254,67 @@ export async function toggleFavorite(req, res) {
 
   res.status(200).json({success: true, message: "Successfully toggled favorite on the song"})
 }
+
+// reset metadata of a song
+export async function resetSong(req, res) {
+  const {songId} = req.body
+  checkReq(!songId)
+
+  const [dbSong] = await safeOperation(
+    () => db.query("select fk_UserDataId, songFileName from Songs where songId = ?", [songId]),
+    "Error while fetching song owner"
+  )
+
+  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  
+  const metadata = await safeOperation(
+    () => parseFile(`./songs/audio/${dbSong[0].songFileName}.m4a`),
+    "Error while reading metadata"
+  )
+
+  const common = metadata.common
+
+  let artistId = 0
+  if (common.artist) {
+    const [dbArtist] = await safeOperation(
+      () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [common.artist]),
+      "Error while selecting artist from the database"
+    )
+
+    if (dbArtist.length === 0) {
+      const [artistResult] = await safeOperation(
+        () => db.query("insert into Artists (artistName) values (?)", [common.artist]),
+        "Error while inserting new artist"
+      )
+      artistId = artistResult.insertId
+    } else {
+      artistId = dbArtist[0].artistId
+    }
+  } else {
+    artistId = 1
+  }
+
+  if (metadata.common.picture && metadata.common.picture.length > 0) {
+    await safeOperation(
+      async () => {
+        const cover = common.picture[0]
+        const convertedCover = await sharp(cover.data).jpeg().toBuffer()
+        const coverFilepath = `./songs/cover/${dbSong[0].songFileName}.jpg`
+
+        await unlink(coverFilepath)
+        await writeFile(coverFilepath, convertedCover)
+      },
+      "Error while resetting the cover"
+    )
+  }
+
+  await safeOperation(
+    () => db.query("update Songs set title = ?, genre = ?, releaseYear = ?, fk_ArtistId = ? where songId = ?",
+                   [common.title, common.genre, common.year, artistId, songId]
+    ),
+    "Error while updating the song metadata"
+  )
+
+  res.status(200).json({success: true, message: "Successfully reset the song metadata"})
+} 

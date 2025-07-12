@@ -127,6 +127,7 @@ songRouter.get("/cover/:filename", checkAuth, routeWrapper(songHandlers.getCover
 songRouter.patch("/edit-song", checkAuth, upload('./songs/cover'), routeWrapper(songHandlers.editSong))
 songRouter.delete("/delete-song", checkAuth, routeWrapper(songHandlers.deleteSong))
 songRouter.post("/toggle-favorite", checkAuth, routeWrapper(songHandlers.toggleFavorite))
+songRouter.put("/reset-song", checkAuth, routeWrapper(songHandlers.resetSong))
 
 app.use("/songs", songRouter)
 

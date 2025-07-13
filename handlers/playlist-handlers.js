@@ -176,7 +176,51 @@ export async function allPlaylists(req, res) {
 
 // get a single playlist with songs
 export async function playlist(req, res) {
+  const {playlistId} = req.query
+  checkReq(!playlistId)
 
+  const [playlist] = await safeOperation(
+    () => db.query(`select * from Playlists where playlistId = ?`, [playlistId]),
+    "Error while fetching playlist from database"
+  )
+
+  if (playlist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (playlist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+
+  const [songs] = await safeOperation(
+    () => db.query(`select songId, title, artistName, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName
+                    from PlaylistSongs join Songs on songId = fk_SongId join Artists on artistId = fk_ArtistId
+                    where fk_PlaylistId = ?`, [playlistId]),
+    "Error while fetching playlist songs from the database"
+  )
+
+  const playlistCoverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist[0].playlistCoverFileName}.jpg`
+
+  const formattedSongs = songs.map(song => {
+    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
+
+    return {
+      songId: song.songId,
+      title: song.title,
+      artist: song.artistName,
+      genre: song.genre,
+      duration: song.duration,
+      releaseYear: song.releaseYear,
+      isFavorite: Boolean(song.isFavorite),
+      lastPlayed: song.lastPlayed,
+      cover: coverURL
+    }
+  })
+
+  const responseObject = {
+    playlistId: playlist[0].playlistId,
+    name: playlist[0].playlistName,
+    description: playlist[0].playlistDescription,
+    cover: playlistCoverURL,
+    songs: formattedSongs
+  }
+
+  res.status(200).json({success: true, message: "Successfully retrieved playlist from database", playlist: responseObject})
 }
 
 // get cover image

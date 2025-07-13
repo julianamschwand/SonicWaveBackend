@@ -8,12 +8,18 @@ export class HttpError extends Error {
 
 export function routeWrapper(handler) {
   return async function (req, res, next) {
+
     try {
       await handler(req, res, next)
     } catch (error) {
       if (!(error instanceof HttpError)) {
-        console.error("Error", error)
-        res.status(500).json({success: false, message: "Unhandled error"})
+        if (/'req.body' as it is undefined/.test(error.message)) {
+          res.status(400).json({success: false, message: "Body is missing"})
+        } else {
+          console.error("Error", error)
+          res.status(500).json({success: false, message: "Unhandled error"})
+        }
+        
       } else {
         if (error.json) res.status(error.status || 500).json({success: false, message: error.message, ...error.json})
         else res.status(error.status || 500).json({success: false, message: error.message})

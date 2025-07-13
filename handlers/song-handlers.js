@@ -5,16 +5,66 @@ import sharp from 'sharp'
 import { randomUUID } from 'crypto'
 import { exec as execCb } from 'child_process'
 import { parseFile } from 'music-metadata'
-import { unlink, writeFile, copyFile } from 'fs/promises'
+import { createReadStream } from 'fs'
+import { unlink, writeFile, copyFile, stat } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
 dotenv.config()
 
 const exec = util.promisify(execCb)
 
-// play a downloaded song
+// stream a song to a client
 export async function playSong(req, res) {
+  const {songId} = req.query
+  checkReq(!songId)
 
+  const [dbSong] = await safeOperation(
+    () => db.query("select fk_UserDataId, songFileName from Songs where songId = ?", [songId]),
+    "Error while fetching song owner"
+  )
+
+  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+
+	const songPath = `./songs/audio/${dbSong[0].songFileName}.m4a`
+	const songStat = await safeOperation(
+    () => stat(songPath),
+    "Error while fetching song stats"
+  )
+  const songSize = songStat.size
+
+	const range = req.headers.range
+	if (!range) {
+      res.writeHead(200, {
+        'Content-Length': songSize,
+        'Content-Type': 'audio/mp4',
+      })
+      const fileStream = createReadStream(songPath)
+      fileStream.pipe(res)
+	} else {
+		const bytesPrefix = "bytes="
+		if (!range.startsWith(bytesPrefix)) {
+			return res.status(400).send("Malformed Range header")
+		}
+		const bytesRange = range.substring(bytesPrefix.length).split("-")
+		const start = parseInt(bytesRange[0])
+		const end = bytesRange[1] ? parseInt(bytesRange[1]) : songSize - 1
+
+		if (start >= songSize || end >= songSize) {
+			return res.status(416).header('Content-Range', `bytes */${songSize}`).end()
+		}
+
+		const chunkSize = (end - start) + 1
+		const fileStream = createReadStream(songPath, { start, end })
+		
+		res.writeHead(206, {
+			'Content-Range': `bytes ${start}-${end}/${songSize}`,
+			'Accept-Ranges': 'bytes',
+			'Content-Length': chunkSize,
+			'Content-Type': 'audio/mp4'
+		})
+		fileStream.pipe(res)
+	}
 }
 
 // download a song by URL
@@ -315,7 +365,6 @@ export async function resetSong(req, res) {
 		},
 		"Error while resetting the cover"
 	)
-
 
   await safeOperation(
     () => db.query("update Songs set title = ?, genre = ?, releaseYear = ?, fk_ArtistId = ? where songId = ?",

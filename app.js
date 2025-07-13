@@ -142,6 +142,7 @@ playlistRouter.post("/add-to-playlist", checkAuth, routeWrapper(playlistHandlers
 playlistRouter.delete("/delete-from-playlist", checkAuth, routeWrapper(playlistHandlers.deleteFromPlaylist))
 playlistRouter.get("/all-playlists", checkAuth, routeWrapper(playlistHandlers.allPlaylists))
 playlistRouter.get("/playlist", checkAuth, routeWrapper(playlistHandlers.playlist))
+playlistRouter.get("/cover/:filename", checkAuth, routeWrapper(playlistHandlers.getCover))
 
 app.use("/playlists", playlistRouter)
 

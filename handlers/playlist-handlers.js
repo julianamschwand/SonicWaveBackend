@@ -178,3 +178,18 @@ export async function allPlaylists(req, res) {
 export async function playlist(req, res) {
 
 }
+
+// get cover image
+export async function getCover(req, res) {
+  const filename = req.params.filename
+
+  const [dbUser] = await safeOperation(
+    () => db.query("select fk_UserDataId from Playlists where playlistCoverFileName = ?", [filename.slice(0, -4)]),
+    "Error while checking the covers owner"
+  )
+
+  if (dbUser.length === 0) return res.status(404).json({success: false, message: "Cover not found"})
+  if (dbUser[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
+  
+  res.status(200).sendFile(`${process.cwd()}/playlist-covers/${filename}`)
+}

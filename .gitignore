@@ -3,3 +3,4 @@ node_modules
 bin
 /songs
 playlist-covers
+.vscode

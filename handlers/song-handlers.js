@@ -110,14 +110,14 @@ export async function browseSongs(req, res) {
         "Error while getting song page"
       )
   
-      const image_url = /<img src="([^"]+)"/.exec(songPage.data)
+      const coverURL = /<img src="([^"]+)"/.exec(songPage.data)
       
       const splitMatch = match[1].split("/")
       return {
         name: splitMatch[2][0].toUpperCase() + splitMatch[2].slice(1),
         artist: splitMatch[1][0].toUpperCase() + splitMatch[1].slice(1),
         url,
-        image_url: image_url[1]
+        cover: coverURL[1]
       }
     })
   )
@@ -134,7 +134,7 @@ export async function songs(req, res) {
   )
 
   const formattedSongs = songs.map(song => {
-    const coverUrl = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
+    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
 
     return {
       songId: song.songId,
@@ -145,7 +145,7 @@ export async function songs(req, res) {
       releaseYear: song.releaseYear,
       isFavorite: Boolean(song.isFavorite),
       lastPlayed: song.lastPlayed,
-      cover: coverUrl
+      cover: coverURL
     }
   })
 

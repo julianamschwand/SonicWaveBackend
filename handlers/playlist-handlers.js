@@ -154,7 +154,24 @@ export async function deleteFromPlaylist(req, res) {
 
 // get all playlists without songs
 export async function allPlaylists(req, res) {
+  const [playlists] = await safeOperation(
+    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName from Playlists 
+                    where fk_UserDataId = ?`, [req.session.user.id]),
+    "Error while fetching playlists from database"
+  )
 
+  const formattedPlaylists = playlists.map(playlist => {
+    const coverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.jpg`
+
+    return {
+      playlistId: playlist.playlistId,
+      name: playlist.playlistName,
+      description: playlist.playlistDescription,
+      cover: coverURL
+    }
+  })
+
+  res.status(200).json({success: true, message: "Successfully retrieved playlists from database", playlists: formattedPlaylists})
 }
 
 // get a single playlist with songs

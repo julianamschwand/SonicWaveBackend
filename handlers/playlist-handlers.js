@@ -118,7 +118,38 @@ export async function addToPlaylist(req, res) {
 
 // delete a song from the playlist
 export async function deleteFromPlaylist(req, res) {
+  const {playlistId, songId} = req.body
+  checkReq(!playlistId || !songId)
 
+  const [dbPlaylist] = await safeOperation(
+    () => db.query("select fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
+    "Error while fetching playlist from database"
+  )
+
+  if (dbPlaylist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (dbPlaylist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+
+  const [dbSong] = await safeOperation(
+    () => db.query("select fk_UserDataId from Songs where songId = ?", [songId]),
+    "Error while fetching song from database"
+  )
+
+  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+
+  const [dbPlaylistSong] = await safeOperation(
+    () => db.query("select * from PlayListSongs where fk_PlaylistId = ? and fk_SongId = ?", [playlistId, songId]),
+    "Error while getting the playlist song"
+  )
+
+  if (dbPlaylistSong.length === 0) return res.status(404).json({success: false, message: "Song is not in playlist"})
+  
+  await safeOperation(
+    () => db.query("delete from PlaylistSongs where fk_PlaylistId = ? and fk_SongId = ?", [playlistId, songId]),
+    "Error while deleting the song from the playlist"
+  )
+
+  res.status(200).json({success: true, message: "Successfully deleted song from playlist"})
 }
 
 // get all playlists without songs

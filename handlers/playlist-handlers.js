@@ -60,7 +60,23 @@ export async function editPlaylist(req, res) {
 
 // delete a playlist
 export async function deletePlaylist(req, res) {
+  const {playlistId} = req.body
+  checkReq(!playlistId)
 
+  const [dbPlaylist] = await safeOperation(
+    () => db.query("select playlistCoverFileName, fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
+    "Error while fetching playlist from database"
+  )
+
+  if (dbPlaylist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (dbPlaylist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+
+  await safeOperation(
+    () => db.query("delete from Playlists where playlistId = ?", [playlistId]),
+    "Error while deleting playlist"
+  )
+
+  res.status(200).json({success: true, message: "Successfully deleted the playlist"})
 }
 
 // add a song to the playlist

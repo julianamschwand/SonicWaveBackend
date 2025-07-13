@@ -5,9 +5,9 @@ import sharp from 'sharp'
 import { randomUUID } from 'crypto'
 import { exec as execCb } from 'child_process'
 import { parseFile } from 'music-metadata'
-import { unlink, writeFile, access } from 'fs/promises'
+import { unlink, writeFile, copyFile } from 'fs/promises'
 import { db } from '../db/db.js'
-import { safeOperation, safeOperations, HttpError, checkReq } from '../error-handling.js'
+import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
 dotenv.config()
 
 const exec = util.promisify(execCb)
@@ -73,6 +73,9 @@ export async function downloadSong(req, res) {
     const cover = common.picture[0]
     const convertedCover = await sharp(cover.data).jpeg().toBuffer()
     await writeFile(`./songs/cover/${filename}.jpg`, convertedCover)
+  } else {
+    const randomNumber = Math.floor(Math.random() * 6) + 1
+    await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./songs/cover/${filename}.jpg`)
   }
 
   await safeOperation(
@@ -295,19 +298,24 @@ export async function resetSong(req, res) {
     artistId = 1
   }
 
-  if (metadata.common.picture && metadata.common.picture.length > 0) {
-    await safeOperation(
-      async () => {
-        const cover = common.picture[0]
-        const convertedCover = await sharp(cover.data).jpeg().toBuffer()
-        const coverFilepath = `./songs/cover/${dbSong[0].songFileName}.jpg`
+  
+	await safeOperation(
+		async () => {
+			if (metadata.common.picture && metadata.common.picture.length > 0) {
+				const cover = common.picture[0]
+				const convertedCover = await sharp(cover.data).jpeg().toBuffer()
+				const coverFilepath = `./songs/cover/${dbSong[0].songFileName}.jpg`
 
-        await unlink(coverFilepath)
-        await writeFile(coverFilepath, convertedCover)
-      },
-      "Error while resetting the cover"
-    )
-  }
+				await unlink(coverFilepath)
+				await writeFile(coverFilepath, convertedCover)
+			} else {
+				const randomNumber = Math.floor(Math.random() * 6) + 1
+				await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./songs/cover/${filename}.jpg`)
+			}
+		},
+		"Error while resetting the cover"
+	)
+
 
   await safeOperation(
     () => db.query("update Songs set title = ?, genre = ?, releaseYear = ?, fk_ArtistId = ? where songId = ?",

@@ -1,6 +1,6 @@
 import sharp from 'sharp'
 import { randomUUID } from 'crypto'
-import { unlink } from 'fs/promises'
+import { unlink, copyFile } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, checkReq } from '../error-handling.js'
 
@@ -10,14 +10,19 @@ export async function createPlaylist(req, res) {
   const cover = req.files.cover
   checkReq(!name)
 
-  let filename = randomUUID()
-  if (cover) {
-    await safeOperation(
-      () => sharp(cover[0].filepath).jpeg().toFile(`./playlist-covers/${filename}.jpg`),
-      "Error while saving cover"
-    )
-  }
-
+  const filename = randomUUID()
+  await safeOperation(
+    async () => {
+      if (cover) {
+        await sharp(cover[0].filepath).jpeg().toFile(`./playlist-covers/${filename}.jpg`)
+      } else {
+        const randomNumber = Math.floor(Math.random() * 6) + 1
+        await copyFile(`./default-images/playlists/${randomNumber}.jpg`, `./playlist-covers/${filename}.jpg`)
+      }
+    },
+    "Error while saving cover"
+  )
+  
   await safeOperation(
     () => db.query(`insert into Playlists (playlistName, playlistDescription, playlistCoverFileName, fk_UserDataId)
                    values (?,?,?,?)`, [name, description, filename, req.session.user.id]),
@@ -72,7 +77,10 @@ export async function deletePlaylist(req, res) {
   if (dbPlaylist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
   await safeOperation(
-    () => db.query("delete from Playlists where playlistId = ?", [playlistId]),
+    async () => {
+      await db.query("delete from Playlists where playlistId = ?", [playlistId])
+      await unlink(`./playlist-covers/${dbPlaylist[0].playlistCoverFileName}`)
+    },
     "Error while deleting playlist"
   )
 
@@ -81,7 +89,31 @@ export async function deletePlaylist(req, res) {
 
 // add a song to the playlist
 export async function addToPlaylist(req, res) {
+  const {playlistId, songId} = req.body
+  checkReq(!playlistId || !songId)
 
+  const [dbPlaylist] = await safeOperation(
+    () => db.query("select fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
+    "Error while fetching playlist from database"
+  )
+
+  if (dbPlaylist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (dbPlaylist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+
+  const [dbSong] = await safeOperation(
+    () => db.query("select fk_UserDataId from Songs where songId = ?", [songId]),
+    "Error while fetching song from database"
+  )
+
+  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+
+  await safeOperation(
+    () => db.query("insert into PlaylistSongs (fk_PlaylistId, fk_SongId) values (?,?)", [playlistId, songId]),
+    "Error while inserting the song into the playlist"
+  )
+
+  res.status(200).json({success: true, message: "Successfully added song to playlist"})
 }
 
 // delete a song from the playlist

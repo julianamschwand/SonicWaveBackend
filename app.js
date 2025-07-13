@@ -139,7 +139,8 @@ playlistRouter.post("/create-playlist", checkAuth, upload("./playlist-covers"), 
 playlistRouter.patch("/edit-playlist", checkAuth, upload("./playlist-covers"), routeWrapper(playlistHandlers.editPlaylist))
 playlistRouter.delete("/delete-playlist", checkAuth, routeWrapper(playlistHandlers.deletePlaylist))
 playlistRouter.post("/add-to-playlist", checkAuth, routeWrapper(playlistHandlers.addToPlaylist))
-playlistRouter.delete("/all-playlists", checkAuth, routeWrapper(playlistHandlers.allPlaylists))
+playlistRouter.delete("/delete-from-playlist", checkAuth, routeWrapper(playlistHandlers.deleteFromPlaylist))
+playlistRouter.get("/all-playlists", checkAuth, routeWrapper(playlistHandlers.allPlaylists))
 playlistRouter.get("/playlist", checkAuth, routeWrapper(playlistHandlers.playlist))
 
 app.use("/playlists", playlistRouter)

@@ -5,7 +5,7 @@ import { safeOperation, safeOperations, HttpError, checkReq } from '../error-han
 
 // get the userdata from a single user
 export async function userdata(req, res) { 
-  const user = await safeOperation( 
+  const [user] = await safeOperation( 
     () => db.query("select username, email, userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving userdata from the database"
   )

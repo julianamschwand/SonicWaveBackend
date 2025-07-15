@@ -163,14 +163,17 @@ export async function browseSongs(req, res) {
       const coverURL = /<img src="([^"]+)"/.exec(songPage.data)
       const titleAndArtist = /<h1 itemprop="name"><a itemprop="url" href="[^"]+">([^<]+)<\/a>\s*by\s*<a[^>]+>([^<]+)/.exec(songPage.data)
       const genre = /"genre" content="([^"]+)"/.exec(songPage.data)
-      const cleanGenre = (genre?.[1] || "(None)").replace(/amp;/, "")
+
+      const cleanTitle = (titleAndArtist?.[1] || "Unknown Title").replace(/amp;/g, "").replace(/&[^;]+;/g, "")
+      const cleanArtist = (titleAndArtist?.[2] || "Unknown Artist").replace(/amp;/g, "").replace(/&[^;]+;/g, "")
+      const cleanGenre = (genre?.[1] || "(None)").replace(/amp;/g, "")
 
       const randomNumber = Math.floor(Math.random() * 6) + 1
       const defaultCoverURL = `${req.protocol}://${req.get('host')}/default-images/songs/${randomNumber}.jpg`
       
       return {
-        title: titleAndArtist?.[1] || "Unknown Title",
-        artist: titleAndArtist?.[2] || "Unknown Artist",
+        title: cleanTitle,
+        artist: cleanArtist,
         genre: cleanGenre,
         url,
         cover: coverURL?.[1] || defaultCoverURL,

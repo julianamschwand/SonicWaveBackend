@@ -146,5 +146,10 @@ playlistRouter.get("/cover/:filename", checkAuth, routeWrapper(playlistHandlers.
 
 app.use("/playlists", playlistRouter)
 
+// serve default covers
+app.use("/default-images/songs", express.static("./default-images/songs"))
+
+// serve on port
+
 const port = process.env.PORT
 app.listen(port, () => console.log(`Server running on port ${port}`))

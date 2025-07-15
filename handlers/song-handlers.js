@@ -159,15 +159,21 @@ export async function browseSongs(req, res) {
         () => axios.get(url),
         "Error while getting song page"
       )
-  
+
       const coverURL = /<img src="([^"]+)"/.exec(songPage.data)
+      const titleAndArtist = /<h1 itemprop="name"><a itemprop="url" href="[^"]+">([^<]+)<\/a>\s*by\s*<a[^>]+>([^<]+)/.exec(songPage.data)
+      const genre = /"genre" content="([^"]+)"/.exec(songPage.data)
+      const cleanGenre = (genre?.[1] || "(None)").replace(/amp;/, "")
+
+      const randomNumber = Math.floor(Math.random() * 6) + 1
+      const defaultCoverURL = `${req.protocol}://${req.get('host')}/default-images/songs/${randomNumber}.jpg`
       
-      const splitMatch = match[1].split("/")
       return {
-        name: splitMatch[2][0].toUpperCase() + splitMatch[2].slice(1),
-        artist: splitMatch[1][0].toUpperCase() + splitMatch[1].slice(1),
+        title: titleAndArtist?.[1] || "Unknown Title",
+        artist: titleAndArtist?.[2] || "Unknown Artist",
+        genre: cleanGenre,
         url,
-        cover: coverURL[1]
+        cover: coverURL?.[1] || defaultCoverURL,
       }
     })
   )

@@ -188,7 +188,7 @@ export async function browseSongs(req, res) {
 export async function songs(req, res) {
   const [songs] = await safeOperation(
     () => db.query(`select songId, title, artistName, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName from Songs
-                    join Artists on fk_ArtistId = artistId`, [req.session.user.id]),
+                    join Artists on fk_ArtistId = artistId order by title`, [req.session.user.id]),
     "Error while fetching songs from database"
   )
 

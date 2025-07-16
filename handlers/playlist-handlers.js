@@ -156,7 +156,7 @@ export async function deleteFromPlaylist(req, res) {
 export async function allPlaylists(req, res) {
   const [playlists] = await safeOperation(
     () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName from Playlists 
-                    where fk_UserDataId = ?`, [req.session.user.id]),
+                    where fk_UserDataId = ? order by playlistName`, [req.session.user.id]),
     "Error while fetching playlists from database"
   )
 
@@ -190,7 +190,7 @@ export async function playlist(req, res) {
   const [songs] = await safeOperation(
     () => db.query(`select songId, title, artistName, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName
                     from PlaylistSongs join Songs on songId = fk_SongId join Artists on artistId = fk_ArtistId
-                    where fk_PlaylistId = ?`, [playlistId]),
+                    where fk_PlaylistId = ? order by title`, [playlistId]),
     "Error while fetching playlist songs from the database"
   )
 

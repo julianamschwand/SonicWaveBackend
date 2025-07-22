@@ -2,17 +2,17 @@ import express from 'express'
 import session from 'express-session'
 import cors from 'cors'
 import dotenv from "dotenv"
-import formidable from 'formidable'
 import { existsSync } from 'fs'
-import { unlink } from 'fs/promises'
 
 import setupWizard from './setup/setup.js'
 import { createSessionStore } from "./db/db.js"
 import { smtpVerifier } from './mailer.js'
-import { routeWrapper } from './error-handling.js'
-import * as userHandlers from './handlers/user-handlers.js'
-import * as songHandlers from './handlers/song-handlers.js'
-import * as playlistHandlers from './handlers/playlist-handlers.js'
+
+import userRouter from './routes/users.js'
+import songRouter from './routes/songs.js'
+import playlistRouter from './routes/playlists.js'
+
+import cleanup from './middleware/cleanup.js'
 
 dotenv.config()
 
@@ -47,109 +47,20 @@ app.use(session({
   }
 }))
 
-// upload middleware
-function upload(uploadDir) {
-  return async function handleUpload(req, res, next) {
-    const form = formidable({
-      uploadDir: uploadDir,
-      keepExtensions: true,
-      maxFileSize: 10 * 1024 * 1024
-    })
-
-    try {
-      const [fields, files] = await form.parse(req)
-
-      req.body = fields
-      req.files = files
-      next()
-    } catch (error) {
-      next(error)
-    }
-  } 
-}
-
 // upload cleanup
-app.use(async (req, res, next) => {
-  res.on("finish", () => {
-    if (req.files) {
-      for (const files of Object.values(req.files)) {
-        for (const file of files) {
-          unlink(file.filepath).catch(error => {
-            console.error("Failed to delete file:", error)
-          })
-        }
-      }
-    }
-  })
+app.use(cleanup)
 
-  next()
-})
-
-// auth middleware
-function checkAuth(req, res, next) {
- if (!req.session.user) {
-    return res.status(401).json({success: false, message: "Not logged in"})
-  }
-  next()
-}
-
+// checking smtp credentials
 await smtpVerifier()
 
-// user routes
-
-const userRouter = express.Router()
-
-userRouter.get("/userdata", checkAuth, routeWrapper(userHandlers.userdata))
-userRouter.post("/register", routeWrapper(userHandlers.register))
-userRouter.post("/login", routeWrapper(userHandlers.login))
-userRouter.post("/logout", checkAuth, routeWrapper(userHandlers.logout))
-userRouter.get("/login-state", routeWrapper(userHandlers.loginState))
-userRouter.patch("/change-password", routeWrapper(userHandlers.changePassword))
-userRouter.get("/send-otp", routeWrapper(userHandlers.sendOTP))
-userRouter.delete("/delete", checkAuth, routeWrapper(userHandlers.deleteUser))
-userRouter.patch("/make-admin", checkAuth, routeWrapper(userHandlers.makeAdmin))
-userRouter.patch("/remove-admin", checkAuth, routeWrapper(userHandlers.removeAdmin))
-userRouter.patch("/approve-register", checkAuth, routeWrapper(userHandlers.approveRegister))
-userRouter.patch("/deny-register", checkAuth, routeWrapper(userHandlers.denyRegister))
-userRouter.get("/register-requests", checkAuth, routeWrapper(userHandlers.registerRequests))
-
+// routes
 app.use("/users", userRouter)
-
-// song routes
-
-const songRouter = express.Router()
-
-songRouter.get("/play", checkAuth, routeWrapper(songHandlers.playSong))
-songRouter.post("/download", checkAuth, routeWrapper(songHandlers.downloadSong))
-songRouter.get("/browse", checkAuth, routeWrapper(songHandlers.browseSongs))
-songRouter.get("/", checkAuth, routeWrapper(songHandlers.songs))
-songRouter.get("/cover/:filename", checkAuth, routeWrapper(songHandlers.getCover))
-songRouter.patch("/edit", checkAuth, upload("./songs/cover"), routeWrapper(songHandlers.editSong))
-songRouter.delete("/delete", checkAuth, routeWrapper(songHandlers.deleteSong))
-songRouter.post("/toggle-favorite", checkAuth, routeWrapper(songHandlers.toggleFavorite))
-songRouter.put("/reset", checkAuth, routeWrapper(songHandlers.resetSong))
-
 app.use("/songs", songRouter)
-
-// playlists
-
-const playlistRouter = express.Router()
-
-playlistRouter.post("/create", checkAuth, upload("./playlist-covers"), routeWrapper(playlistHandlers.createPlaylist))
-playlistRouter.patch("/edit", checkAuth, upload("./playlist-covers"), routeWrapper(playlistHandlers.editPlaylist))
-playlistRouter.delete("/delete", checkAuth, routeWrapper(playlistHandlers.deletePlaylist))
-playlistRouter.post("/add-song", checkAuth, routeWrapper(playlistHandlers.addToPlaylist))
-playlistRouter.delete("/delete-song", checkAuth, routeWrapper(playlistHandlers.deleteFromPlaylist))
-playlistRouter.get("/", checkAuth, routeWrapper(playlistHandlers.allPlaylists))
-playlistRouter.get("/single", checkAuth, routeWrapper(playlistHandlers.playlist))
-playlistRouter.get("/cover/:filename", checkAuth, routeWrapper(playlistHandlers.getCover))
-
 app.use("/playlists", playlistRouter)
 
 // serve default covers
 app.use("/default-images/songs", express.static("./default-images/songs"))
 
 // serve on port
-
 const port = process.env.PORT
 app.listen(port, () => console.log(`Server running on port ${port}`))

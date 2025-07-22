@@ -3,6 +3,22 @@ import { db } from '../db/db.js'
 import { mailer } from '../mailer.js'
 import { safeOperation, safeOperations, HttpError, checkReq } from '../error-handling.js'
 
+// get all users
+export async function allUsers(req, res) {
+  const [reqUser] = await safeOperation( 
+    () => db.query("select userRole from UserData where userDataId = ?", [req.session.user.id]),
+    "Error while retrieving requesting users userdata from the database"
+  )
+
+  if (reqUser[0].userRole !== "owner") return res.status(403).json({success: false, message: "Only the owner can get all users"})
+
+  const [dbUsers] = await safeOperation(
+    () => db.query("select username, userRole from UserData where userRole != 'owner' and approved = true")
+  )
+
+  res.status(200).json({success: true, message: "Successfully retrieved users from database", users: dbUsers})
+}
+
 // get the userdata from a single user
 export async function userdata(req, res) { 
   const [user] = await safeOperation( 

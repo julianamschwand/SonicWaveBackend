@@ -5,6 +5,7 @@ import * as userHandlers from '../handlers/users.js'
 
 const userRouter = express.Router()
 
+userRouter.get("/", checkAuth, routeWrapper(userHandlers.allUsers))
 userRouter.get("/userdata", checkAuth, routeWrapper(userHandlers.userdata))
 userRouter.post("/register", routeWrapper(userHandlers.register))
 userRouter.post("/login", routeWrapper(userHandlers.login))

@@ -17,4 +17,4 @@ const dbOptions = {
 
 export const db = mysql.createPool(dbOptions)
 
-export function createSessionStore() { return new MySQLStore(dbOptions) }
+export function createSessionStore() { return new MySQLStore({}, db) }

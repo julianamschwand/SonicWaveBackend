@@ -29,7 +29,7 @@ export async function createPlaylist(req, res) {
     "Error while inserting playlist into database"
   )
 
-  res.status(200).json({success: true, message: "Successfully made playlists"})
+  res.status(200).json({success: true, message: "Successfully created playlist"})
 }
 
 // edit an existing playlists metadata
@@ -188,9 +188,15 @@ export async function playlist(req, res) {
   if (playlist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
   const [songs] = await safeOperation(
-    () => db.query(`select songId, title, artistName, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName
-                    from PlaylistSongs join Songs on songId = fk_SongId join Artists on artistId = fk_ArtistId
-                    where fk_PlaylistId = ? order by title`, [playlistId]),
+    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, 
+                    json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
+                    from Songs
+                    join SongArtists on SongArtists.fk_SongId = songId
+                    join Artists on fk_ArtistId = artistId
+                    join PlaylistSongs on PlaylistSongs.fk_SongId = songId
+                    where fk_PlaylistId = ?
+                    group by songId 
+                    order by title`, [playlistId]),
     "Error while fetching playlist songs from the database"
   )
 
@@ -202,13 +208,13 @@ export async function playlist(req, res) {
     return {
       songId: song.songId,
       title: song.title,
-      artist: song.artistName,
       genre: song.genre,
       duration: song.duration,
       releaseYear: song.releaseYear,
       isFavorite: Boolean(song.isFavorite),
       lastPlayed: song.lastPlayed,
-      cover: coverURL
+      cover: coverURL,
+      artists: JSON.parse(song.artists)
     }
   })
 

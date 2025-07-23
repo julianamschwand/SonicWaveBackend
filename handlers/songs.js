@@ -99,24 +99,26 @@ export async function downloadSong(req, res) {
   const common = metadata.common
   const format = metadata.format
 
-  let artistId = 0
-  if (common.artist) {
-    const [dbArtist] = await safeOperation(
-      () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [common.artist]),
-      "Error while selecting artist from the database"
-    )
+  const splitArtists = common.artist.split("，").map(artist => artist.trim())
 
-    if (dbArtist.length === 0) {
-      const [artistResult] = await safeOperation(
-        () => db.query("insert into Artists (artistName) values (?)", [common.artist]),
-        "Error while inserting new artist"
+  const artistIds = []
+  if (splitArtists.length > 0) {
+    for (const artist of splitArtists) {
+      const [dbArtist] = await safeOperation(
+        () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist]),
+        "Error while selecting artist from the database"
       )
-      artistId = artistResult.insertId
-    } else {
-      artistId = dbArtist[0].artistId
+
+      if (dbArtist.length === 0) {
+        const [artistResult] = await safeOperation(
+          () => db.query("insert into Artists (artistName) values (?)", [artist]),
+          "Error while inserting new artist"
+        )
+        artistIds.push(artistResult.insertId)
+      } else {
+        artistIds.push(dbArtist[0].artistId) 
+      }
     }
-  } else {
-    artistId = 1
   }
 
   if (metadata.common.picture && metadata.common.picture.length > 0) {
@@ -128,11 +130,20 @@ export async function downloadSong(req, res) {
     await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./songs/cover/${filename}.jpg`)
   }
 
-  await safeOperation(
-    () => db.query(`insert into Songs (songFileName, title, genre, duration, releaseYear, fk_UserDataId, fk_ArtistId)
-                    values (?,?,?,?,?,?,?)`,
-                    [filename, common.title, common.genre, format.duration, common.year, req.session.user.id, artistId]),
+  const [result] = await safeOperation(
+    () => db.query(`insert into Songs (songFileName, title, genre, duration, releaseYear, fk_UserDataId)
+                    values (?,?,?,?,?,?)`,
+                    [filename, common.title, common.genre, format.duration, common.year, req.session.user.id]),
     "Error while saving Songdata to database"
+  )
+  
+  await safeOperation(
+    async () => {
+      for (const artistId of artistIds) {
+        await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [result.insertId, artistId])
+      }
+    },
+    "Error while inserting Artist references"
   )
   
   res.status(200).json({success: true, message: "Successfully downloaded the song and added it to account"})
@@ -187,8 +198,14 @@ export async function browseSongs(req, res) {
 // get all songs
 export async function songs(req, res) {
   const [songs] = await safeOperation(
-    () => db.query(`select songId, title, artistName, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName from Songs
-                    join Artists on fk_ArtistId = artistId order by title`, [req.session.user.id]),
+    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, 
+                    json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
+                    from Songs
+                    join SongArtists on fk_SongId = songId
+                    join Artists on fk_ArtistId = artistId
+                    where fk_UserDataId = ?
+                    group by songId 
+                    order by title`, [req.session.user.id]),
     "Error while fetching songs from database"
   )
 
@@ -198,13 +215,13 @@ export async function songs(req, res) {
     return {
       songId: song.songId,
       title: song.title,
-      artist: song.artistName,
       genre: song.genre,
       duration: song.duration,
       releaseYear: song.releaseYear,
       isFavorite: Boolean(song.isFavorite),
       lastPlayed: song.lastPlayed,
-      cover: coverURL
+      cover: coverURL,
+      artists: JSON.parse(song.artists)
     }
   })
 

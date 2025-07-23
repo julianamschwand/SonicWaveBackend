@@ -13,7 +13,7 @@ create table Playlists (
   playlistDescription text,
   playlistCoverFileName char(36),
   fk_UserDataId int,
-  foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
+  foreign key (fk_UserDataId) references UserData(userDataId) on delete cascade
 );
 
 create table Artists (
@@ -32,17 +32,23 @@ create table Songs (
   isFavorite boolean default false,
   lastPlayed timestamp,
   fk_UserDataId int,
+  foreign key (fk_UserDataId) references UserData(userDataId) on delete cascade
+);
+
+create table SongArtists(
+  songArtistId int primary key auto_increment,
+  fk_SongId int,
   fk_ArtistId int,
-  foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade,
-  foreign key (fk_ArtistId) references Artists(ArtistId)
+  foreign key (fk_SongId) references Songs(songId) on delete cascade,
+  foreign key (fk_ArtistId) references Artists(artistId) on delete cascade
 );
 
 create table PlaylistSongs (
   playlistSongId int primary key auto_increment,
   fk_PlaylistId int,
   fk_SongId int,
-  foreign key (fk_PlaylistId) references Playlists(PlaylistId) on delete cascade,
-  foreign key (fk_SongId) references Songs(SongId) on delete cascade
+  foreign key (fk_PlaylistId) references Playlists(playlistId) on delete cascade,
+  foreign key (fk_SongId) references Songs(songId) on delete cascade
 );
 
 create table OneTimePasswords (
@@ -50,5 +56,5 @@ create table OneTimePasswords (
   otp char(6),
   attemptsRemaining int default 3,
   fk_UserDataId int,
-  foreign key (fk_UserDataId) references UserData(UserDataId) on delete cascade
+  foreign key (fk_UserDataId) references UserData(userDataId) on delete cascade
 );

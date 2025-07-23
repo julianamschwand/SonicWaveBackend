@@ -18,3 +18,9 @@ const dbOptions = {
 export const db = mysql.createPool(dbOptions)
 
 export function createSessionStore() { return new MySQLStore({}, db) }
+
+setInterval(async () => {
+  db.query('SELECT 1').catch(() => {
+    console.error("DB keep-alive failed")
+  })
+}, 1000 * 60 * 5)

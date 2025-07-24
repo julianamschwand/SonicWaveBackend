@@ -13,7 +13,7 @@ export async function allUsers(req, res) {
   if (reqUser[0].userRole !== "owner") return res.status(403).json({success: false, message: "Only the owner can get all users"})
 
   const [dbUsers] = await safeOperation(
-    () => db.query("select username, email, userRole from UserData where userRole != 'owner' and approved = true")
+    () => db.query("select userDataId, username, email, userRole from UserData where userRole != 'owner' and approved = true")
   )
 
   res.status(200).json({success: true, message: "Successfully retrieved users from database", users: dbUsers})

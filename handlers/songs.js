@@ -245,7 +245,7 @@ export async function getCover(req, res) {
 
 // edit an existing songs metadata
 export async function editSong(req, res) {
-  const {songId, title, artist, genre, releaseYear} = req.body
+  const {songId, title, artistAdd, artistDelete, genre, releaseYear} = req.body
   const cover = req.files.cover
   checkReq(!songId)
 
@@ -259,20 +259,29 @@ export async function editSong(req, res) {
 
   await safeOperation(
     async () => {
+      if (artistDelete) {
+        for (const artist of JSON.parse(artistDelete)) {
+          const [dbArtist] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
+          if (dbArtist.length === 0) return res.status(404).json({success: false, message: "Artist to delete not found"})
+          await db.query("delete from SongArtists where fk_SongId = ? and fk_ArtistId = ?", [songId, dbArtist[0].artistId])
+        }
+      }
+      if (artistAdd) {
+        for (const artist of JSON.parse(artistAdd)) {
+          let artistId = 0
+          const [dbArtist] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
+          if (dbArtist.length === 0) {
+            const [artistResult] = await db.query("insert into Artists (artistName) values (?)", [artist])
+            artistId = artistResult.insertId
+          } else {
+            artistId = dbArtist[0].artistId
+          }
+          await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [songId, artistId])
+        }
+      } 
       if (title) await db.query("update Songs set title = ? where songId = ?", [title, songId])
       if (genre) await db.query("update Songs set genre = ? where songId = ?", [genre, songId])
       if (releaseYear) await db.query("update Songs set releaseYear = ? where songId = ?", [releaseYear, songId])
-      if (artist) {
-        let artistId = 0
-        const [dbArtist] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
-        if (dbArtist.length === 0) {
-          const [artistResult] = await db.query("insert into Artists (artistName) values (?)", [artist])
-          artistId = artistResult.insertId
-        } else {
-          artistId = dbArtist[0].artistId
-        }
-        await db.query("update Songs set fk_ArtistId = ? where songId = ?", [artistId, songId])
-      }
       if (cover) {
         const coverFilepath = `./songs/cover/${dbSong[0].songFileName}.jpg`
 
@@ -354,26 +363,38 @@ export async function resetSong(req, res) {
 
   const common = metadata.common
 
-  let artistId = 0
-  if (common.artist) {
-    const [dbArtist] = await safeOperation(
-      () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [common.artist]),
-      "Error while selecting artist from the database"
-    )
+  const splitArtists = common.artist.split("，").map(artist => artist.trim())
 
-    if (dbArtist.length === 0) {
-      const [artistResult] = await safeOperation(
-        () => db.query("insert into Artists (artistName) values (?)", [common.artist]),
-        "Error while inserting new artist"
+  const artistIds = []
+  if (splitArtists.length > 0) {
+    for (const artist of splitArtists) {
+      const [dbArtist] = await safeOperation(
+        () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist]),
+        "Error while selecting artist from the database"
       )
-      artistId = artistResult.insertId
-    } else {
-      artistId = dbArtist[0].artistId
+
+      if (dbArtist.length === 0) {
+        const [artistResult] = await safeOperation(
+          () => db.query("insert into Artists (artistName) values (?)", [artist]),
+          "Error while inserting new artist"
+        )
+        artistIds.push(artistResult.insertId)
+      } else {
+        artistIds.push(dbArtist[0].artistId) 
+      }
     }
-  } else {
-    artistId = 1
   }
 
+  await safeOperation(
+    async () => {
+      await db.query("delete from SongArtists where fk_SongId = ?", [songId])
+
+      for (const artistId of artistIds) {
+        await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [songId, artistId])
+      }
+    },
+    "Error while resetting Artist references"
+  )
   
 	await safeOperation(
 		async () => {
@@ -393,8 +414,8 @@ export async function resetSong(req, res) {
 	)
 
   await safeOperation(
-    () => db.query("update Songs set title = ?, genre = ?, releaseYear = ?, fk_ArtistId = ? where songId = ?",
-                   [common.title, common.genre, common.year, artistId, songId]
+    () => db.query("update Songs set title = ?, genre = ?, releaseYear = ? where songId = ?",
+                   [common.title, common.genre, common.year, songId]
     ),
     "Error while updating the song metadata"
   )

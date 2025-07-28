@@ -18,14 +18,14 @@ create table Playlists (
 
 create table Artists (
   artistId int primary key auto_increment,
-  artistName varchar(50) unique,
+  artistName varchar(100) unique,
   artistDescription text
 );
 
 create table Songs (
   songId int primary key auto_increment,
   songFileName char(36) unique,
-  title varchar(50),
+  title varchar(100),
   genre varchar(20),
   duration int,
   releaseYear int,

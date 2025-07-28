@@ -26,6 +26,11 @@ export async function playSong(req, res) {
   if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
   if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
+  await safeOperation(
+    () => db.query("update Songs set lastPlayed = ? where songId = ?", [new Date(), songId]),
+    "Error while updating last played timestamp"
+  )
+
 	const songPath = `./songs/audio/${dbSong[0].songFileName}.m4a`
 	const songStat = await safeOperation(
     () => stat(songPath),

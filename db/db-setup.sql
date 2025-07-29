@@ -4,7 +4,8 @@ create table UserData (
   email varchar(254) unique,
   passwordHash varchar(255),
   userRole enum('user','admin','owner'),
-  approved boolean
+  approved boolean,
+  queueIndex int
 );
 
 create table Playlists (
@@ -57,4 +58,12 @@ create table OneTimePasswords (
   attemptsRemaining int default 3,
   fk_UserDataId int,
   foreign key (fk_UserDataId) references UserData(userDataId) on delete cascade
+);
+
+create table QueuedSongs (
+  queuedSongId int primary key auto_increment,
+  fk_UserDataId int,
+  fk_SongId int,
+  foreign key (fk_UserDataId) references UserData(userDataId) on delete cascade,
+  foreign key (fk_SongId) references Songs(songId) on delete cascade
 );

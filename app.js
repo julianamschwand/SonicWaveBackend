@@ -11,6 +11,7 @@ import { smtpVerifier } from './mailer.js'
 import userRouter from './routes/users.js'
 import songRouter from './routes/songs.js'
 import playlistRouter from './routes/playlists.js'
+import queueRouter from './routes/queue.js'
 
 import cleanup from './middleware/cleanup.js'
 
@@ -57,6 +58,7 @@ await smtpVerifier()
 app.use("/users", userRouter)
 app.use("/songs", songRouter)
 app.use("/playlists", playlistRouter)
+app.use("/queue", queueRouter)
 
 // serve default covers
 app.use("/default-images/songs", express.static("./default-images/songs"))

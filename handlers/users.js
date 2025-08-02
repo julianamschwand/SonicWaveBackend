@@ -5,12 +5,12 @@ import { safeOperation, safeOperations, HttpError, checkReq } from '../error-han
 
 // get all users
 export async function allUsers(req, res) {
-  const [reqUser] = await safeOperation( 
+  const [[reqUser]] = await safeOperation( 
     () => db.query("select userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving requesting users userdata from the database"
   )
 
-  if (reqUser[0].userRole !== "owner") return res.status(403).json({success: false, message: "Only the owner can get all users"})
+  if (reqUser.userRole !== "owner") return res.status(403).json({success: false, message: "Only the owner can get all users"})
 
   const [dbUsers] = await safeOperation(
     () => db.query("select userDataId, username, email, userRole from UserData where userRole != 'owner' and approved = true")
@@ -21,12 +21,12 @@ export async function allUsers(req, res) {
 
 // get the userdata from a single user
 export async function userdata(req, res) { 
-  const [user] = await safeOperation( 
+  const [[user]] = await safeOperation( 
     () => db.query("select username, email, userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving userdata from the database"
   )
   
-  res.status(200).json({success: true, message: "Successfully retrieved userdata from database", user: user[0]})
+  res.status(200).json({success: true, message: "Successfully retrieved userdata from database", user: user})
 }
 
 // register a new user
@@ -57,7 +57,7 @@ export async function login(req, res) {
   const {username, email, password} = req.body
   checkReq((!username && !email) || !password)
 
-  const [dbUser] = await safeOperation(
+  const [[dbUser]] = await safeOperation(
     async () => {
       if (username) {
         return await db.query("select * from UserData where username = ?", [username])
@@ -68,14 +68,14 @@ export async function login(req, res) {
     "Error while fetching user from the database"
   )
 
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "User not found"})
+  if (!dbUser) return res.status(404).json({success: false, message: "User not found"})
 
-  const isPasswordValid = await bcrypt.compare(password, dbUser[0].passwordHash)
+  const isPasswordValid = await bcrypt.compare(password, dbUser.passwordHash)
   if (!isPasswordValid) return res.status(401).json({success: false, message: "Wrong password"})
 
-  if (!dbUser[0].approved) return res.status(403).json({success: false, message: "Register request hasn't been approved yet"})
+  if (!dbUser.approved) return res.status(403).json({success: false, message: "Register request hasn't been approved yet"})
 
-  req.session.user = { id: dbUser[0].userDataId }
+  req.session.user = { id: dbUser.userDataId }
   res.status(200).json({success: true, message: "User successfully logged in"})
 }
 
@@ -103,35 +103,38 @@ export async function changePassword(req, res) {
   checkReq((!userDataId && !email) || (!passwordOld && !otp) || !passwordNew)
   
   if (!userDataId) {
-    const [dbUser] = await safeOperation(
+    const [[dbUser]] = await safeOperation(
       () => db.query("select userDataId from UserData where email = ?", [email]),
       "Error while fetching userdata from the database"
     )
-    userDataId = dbUser[0].userDataId;
-  }
+
+    if (!dbUser) return res.status(404).json({success: false, message: "User not found"})
+
+    userDataId = dbUser.userDataId;
+  } 
 
   if (passwordOld) {
-    const [dbUser] = await safeOperation(
+    const [[dbUser]] = await safeOperation(
       () => db.query("select passwordHash from UserData where userDataId = ?", [userDataId]),
       "Error while verifying old password"
     )
-    const isPasswordValid = await bcrypt.compare(passwordOld, dbUser[0].passwordHash)
+    const isPasswordValid = await bcrypt.compare(passwordOld, dbUser.passwordHash)
     if (!isPasswordValid) return res.status(401).json({success: false, message: "Wrong password"})
 
   } else {
     await safeOperation(
       async () => {
-        const [dbOTP] = await db.query("select otp from OneTimePasswords where fk_UserDataId = ?", [userDataId])
+        const [[dbOTP]] = await db.query("select otp from OneTimePasswords where fk_UserDataId = ?", [userDataId])
 
-        if (dbOTP.length === 0) throw new HttpError("No valid OTP found for this account", 404)
+        if (!dbOTP) throw new HttpError("No valid OTP found for this account", 404)
 
 
-        if (dbOTP[0].otp !== otp) {
+        if (dbOTP.otp !== otp) {
           await db.query("update OneTimePasswords set attemptsRemaining = attemptsRemaining - 1 where fk_UserDataId = ?", [userDataId])
-          const [otpAtt] = await db.query("select attemptsRemaining from OneTimePasswords where fk_UserDataId = ?", [userDataId])
-          if (otpAtt[0].attemptsRemaining === 0) await db.query("delete from OneTimePasswords where fk_UserDataId = ?", [userDataId])
+          const [[otpAtt]] = await db.query("select attemptsRemaining from OneTimePasswords where fk_UserDataId = ?", [userDataId])
+          if (otpAtt.attemptsRemaining === 0) await db.query("delete from OneTimePasswords where fk_UserDataId = ?", [userDataId])
           
-          throw new HttpError("Wrong Password", 401, {attemptsRemaining: otpAtt[0].attemptsRemaining})
+          throw new HttpError("Wrong Password", 401, {attemptsRemaining: otpAtt.attemptsRemaining})
         }
 
         await db.query("delete from OneTimePasswords where fk_UserDataId = ?", [userDataId])
@@ -153,12 +156,12 @@ export async function sendOTP(req, res) {
   const {email} = req.body
   checkReq(!email)
 
-  const [dbUser] = await safeOperation(
+  const [[dbUser]] = await safeOperation(
     () => db.query("select userDataId from UserData where email = ?", [email]),
     "Error while fetching userdata from the database"
   )
 
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "No user with this E-Mail"})
+  if (!dbUser) return res.status(404).json({success: false, message: "No user with this E-Mail"})
   
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   let code = ''
@@ -168,8 +171,8 @@ export async function sendOTP(req, res) {
 
   const result = await safeOperation(
     async () => {
-      await db.query("delete from OneTimePasswords where fk_UserDataId = ?", [dbUser[0].userDataId])
-      const [result] = await db.query("insert into OneTimePasswords (otp,fk_UserDataId) values (?,?)", [code, dbUser[0].userDataId])
+      await db.query("delete from OneTimePasswords where fk_UserDataId = ?", [dbUser.userDataId])
+      const [result] = await db.query("insert into OneTimePasswords (otp,fk_UserDataId) values (?,?)", [code, dbUser.userDataId])
       return result
     },
     "Error while saving the code to the database"
@@ -193,22 +196,22 @@ export async function deleteUser(req, res) {
   const {userDataId} = req.body
   checkReq(!userDataId)
   
-  const [[reqUser], [dbUser]] = await safeOperations([
+  const [[[reqUser]], [[dbUser]]] = await safeOperations([
     () => db.query("select * from UserData where userDataId = ?", [req.session.user.id]),
     () => db.query("select * from UserData where userDataId = ?", [userDataId])
   ], "Error while retrieving userdata from the database")
 
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "User not found"})
-  if (reqUser[0].userRole === "user") return res.status(403).json({success: false, message: "Only admins and the owner can delete users"})
-  if (dbUser[0].userRole === "owner") return res.status(403).json({success: false, message: "Can't delete owner"})
-  if (dbUser[0].userRole === "admin" && reqUser[0].userRole !== "owner") return res.status(403).json({success: false, message: "Can only delete admins as owner"})
+  if (!dbUser) return res.status(404).json({success: false, message: "User not found"})
+  if (reqUser.userRole === "user" && dbUser.userDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Only admins and the owner can delete users other than themself"})
+  if (dbUser.userRole === "owner") return res.status(403).json({success: false, message: "Can't delete owner"})
+  if (dbUser.userRole === "admin" && reqUser.userRole !== "owner") return res.status(403).json({success: false, message: "Can only delete admins as owner"})
   
   await safeOperation(
     () => db.query("delete from UserData where userDataId = ?", [userDataId]),
     "Error while deleting user"
   )
 
-  res.status(200).json({success: true, message: `Successfully deleted '${dbUser[0].username}'`})
+  res.status(200).json({success: true, message: `Successfully deleted '${dbUser.username}'`})
 }
 
 // promote a user to admin. Only accessible to owner
@@ -216,28 +219,28 @@ export async function makeAdmin(req, res) {
   const {userDataId} = req.body
   checkReq(!userDataId)
   
-  const [reqUser] = await safeOperation(
+  const [[reqUser]] = await safeOperation(
     () => db.query("select userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving the requesting users userdata from the database"
   )
 
-  if (reqUser[0].userRole !== "owner") return res.status(403).json({success: false, message: "Only the owner can manage user roles"})
+  if (reqUser.userRole !== "owner") return res.status(403).json({success: false, message: "Only the owner can manage user roles"})
 
-  const [dbUser] = await safeOperation(
+  const [[dbUser]] = await safeOperation(
     () => db.query("select username, userRole from UserData where userDataId = ?", [userDataId]),
     "Error while retrieving the requested users userdata from the database"
   )
 
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "User not found"})
-  if (dbUser[0].userRole === "admin") return res.status(409).json({success: false, message: "User is already admin"})
-  if (dbUser[0].userRole === "owner") return res.status(403).json({success: false, message: "Can't change the owners role"})
+  if (!dbUser) return res.status(404).json({success: false, message: "User not found"})
+  if (dbUser.userRole === "admin") return res.status(409).json({success: false, message: "User is already admin"})
+  if (dbUser.userRole === "owner") return res.status(403).json({success: false, message: "Can't change the owners role"})
   
   await safeOperation(
     () => db.query("update UserData set userRole = 'admin' where userDataId = ?", [userDataId]),
     "Error while promoting user"
   )
 
-  res.status(200).json({success: true, message: `Successfully promoted '${dbUser[0].username}' to admin`})
+  res.status(200).json({success: true, message: `Successfully promoted '${dbUser.username}' to admin`})
 }
 
 // demote an admin to user. Only accessible by owner
@@ -245,29 +248,29 @@ export async function removeAdmin(req, res) {
   const {userDataId} = req.body
   checkReq(!userDataId)
   
-  const [reqUser] = await safeOperation(
+  const [[reqUser]] = await safeOperation(
     () => db.query("select userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving the requesting users userdata from the database"
   )
   
 
-  if (reqUser[0].userRole !== "owner") return res.status(403).json({success: false, message: "Only the owner can manage user roles"})
+  if (reqUser.userRole !== "owner") return res.status(403).json({success: false, message: "Only the owner can manage user roles"})
 
-  const [dbUser] = await safeOperation(
+  const [[dbUser]] = await safeOperation(
     () => db.query("select username, userRole from UserData where userDataId = ?", [userDataId]),
     "Error while retrieving the requested users userdata from the database"
   )
 
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "User not found"})
-  if (dbUser[0].userRole === "owner") return res.status(403).json({success: false, message: "Can't change the owners role"})
-  if (dbUser[0].userRole !== "admin") return res.status(409).json({success: false, message: "User is not an admin"})
+  if (!dbUser) return res.status(404).json({success: false, message: "User not found"})
+  if (dbUser.userRole === "owner") return res.status(403).json({success: false, message: "Can't change the owners role"})
+  if (dbUser.userRole !== "admin") return res.status(409).json({success: false, message: "User is not an admin"})
   
   await safeOperation(
     () => db.query("update UserData set userRole = 'user' where userDataId = ?", [userDataId]),
     "Error while demoting user"
   )
   
-  res.status(200).json({success: true, message: `Successfully demoted '${dbUser[0].username}' to user`})
+  res.status(200).json({success: true, message: `Successfully demoted '${dbUser.username}' to user`})
 }
 
 // approve a register request. Only accessible to admin and owner
@@ -275,27 +278,27 @@ export async function approveRegister(req, res) {
   const {userDataId} = req.body
   checkReq(!userDataId)
 
-  const [reqUser] = await safeOperation(
+  const [[reqUser]] = await safeOperation(
     () =>  db.query("select userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving userdata from the database"
   )
 
-  if (reqUser[0].userRole !== "owner" && reqUser[0].userRole !== "admin") return res.status(403).json({success: false, message: "Only admins and the owner can approve register requests"})
+  if (reqUser.userRole !== "owner" && reqUser.userRole !== "admin") return res.status(403).json({success: false, message: "Only admins and the owner can approve register requests"})
 
-  const [dbUser] = await safeOperation(
+  const [[dbUser]] = await safeOperation(
     () => db.query("select username, approved from UserData where userDataId = ?", [userDataId]),
     "Error while retrieving register requests from the database"
   )
   
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "Register request not found"})
-  if (dbUser[0].approved) return res.status(409).json({success: false, message: "User is already registered"})
+  if (!dbUser) return res.status(404).json({success: false, message: "Register request not found"})
+  if (dbUser.approved) return res.status(409).json({success: false, message: "User is already registered"})
   
   await safeOperation(
     () => db.query("update UserData set approved = true where userDataId = ?", [userDataId]),
     "Error while accepting register request"
   )
 
-  res.status(200).json({success: true, message: `Successfully approved the register request of user '${dbUser[0].username}'`})
+  res.status(200).json({success: true, message: `Successfully approved the register request of user '${dbUser.username}'`})
 }
 
 // deny a register request. Only accessible to admin and owner
@@ -303,37 +306,37 @@ export async function denyRegister(req, res) {
   const {userDataId} = req.body
   checkReq(!userDataId)
   
-  const [reqUser] = await safeOperation(
+  const [[reqUser]] = await safeOperation(
     () => db.query("select userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving userdata from the database"
   )
 
-  if (reqUser[0].userRole !== "owner" && reqUser[0].userRole !== "admin") return res.status(403).json({success: false, message: "Only admins and the owner can deny register requests"}) 
+  if (reqUser.userRole !== "owner" && reqUser.userRole !== "admin") return res.status(403).json({success: false, message: "Only admins and the owner can deny register requests"}) 
 
-  const [dbUser] = await safeOperation(
+  const [[dbUser]] = await safeOperation(
     () => db.query("select username, approved from UserData where userDataId = ?", [userDataId]),
     "Error while retrieving register requests from the database"
   )
 
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "Register request not found"})
-  if (dbUser[0].approved) return res.status(409).json({success: false, message: "User is already registered"})
+  if (!dbUser) return res.status(404).json({success: false, message: "Register request not found"})
+  if (dbUser.approved) return res.status(409).json({success: false, message: "User is already registered"})
   
   await safeOperation(
     () => db.query("delete from UserData where userDataId = ?", [userDataId]),
     "Error while denying register request"
   )
   
-  res.status(200).json({success: true, message: `Successfully denied and deleted the register request of user '${dbUser[0].username}'`})
+  res.status(200).json({success: true, message: `Successfully denied and deleted the register request of user '${dbUser.username}'`})
 }
 
 // get all register requests. Only accessible by admin and owner
 export async function registerRequests(req, res) {
-  const [reqUser] = await safeOperation(
+  const [[reqUser]] = await safeOperation(
     () => db.query("select userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving userdata from the database"
   )
 
-  if (reqUser[0].userRole !== "owner" && reqUser[0].userRole !== "admin") return res.status(403).json({success: false, message: "Only admins and the owner can see register requests"}) 
+  if (reqUser.userRole !== "owner" && reqUser.userRole !== "admin") return res.status(403).json({success: false, message: "Only admins and the owner can see register requests"}) 
 
   const [regRequests] = await safeOperation(
     () => db.query("select userDataId, username, email from UserData where approved = false"),

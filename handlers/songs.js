@@ -18,20 +18,20 @@ export async function playSong(req, res) {
   const {songId} = req.query
   checkReq(!songId)
 
-  const [dbSong] = await safeOperation(
+  const [[dbSong]] = await safeOperation(
     () => db.query("select fk_UserDataId, songFileName from Songs where songId = ?", [songId]),
     "Error while fetching song owner"
   )
 
-  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
-  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
   await safeOperation(
     () => db.query("update Songs set lastPlayed = ? where songId = ?", [new Date(), songId]),
     "Error while updating last played timestamp"
   )
 
-	const songPath = `./songs/audio/${dbSong[0].songFileName}.m4a`
+	const songPath = `./songs/audio/${dbSong.songFileName}.m4a`
 	const songStat = await safeOperation(
     () => stat(songPath),
     "Error while fetching song stats"
@@ -200,6 +200,42 @@ export async function browseSongs(req, res) {
   res.status(200).json({success: true, message: "Successfully fetched songs", songs: structured})
 }
 
+// get a single song
+export async function song(req, res) {
+  const {songId} = req.query
+  checkReq(!songId)
+
+  const [[song]] = await safeOperation(
+    () => db.query(`select title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, fk_UserDataId, 
+                    json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
+                    from Songs
+                    join SongArtists on fk_SongId = songId
+                    join Artists on fk_ArtistId = artistId
+                    where fk_UserDataId = ? and songId = ?
+                    group by songId`, [req.session.user.id, songId]),
+    "Error while fetching song from database"
+  )
+
+  if (!song) return res.status(404).json({success: false, message: "Song not found"})
+  if (song.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  
+  const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
+  
+  const formattedSong = {
+    songId: song.songId,
+    title: song.title,
+    genre: song.genre,
+    duration: song.duration,
+    releaseYear: song.releaseYear,
+    isFavorite: Boolean(song.isFavorite),
+    lastPlayed: song.lastPlayed,
+    cover: coverURL,
+    artists: JSON.parse(song.artists)
+  }
+
+  res.status(200).json({success: true, message: "Successfully retrieved song from database", song: formattedSong})
+}
+
 // get all songs
 export async function songs(req, res) {
   const [songs] = await safeOperation(
@@ -237,13 +273,13 @@ export async function songs(req, res) {
 export async function getCover(req, res) {
   const filename = req.params.filename
 
-  const [dbUser] = await safeOperation(
+  const [[dbUser]] = await safeOperation(
     () => db.query("select fk_UserDataId from Songs where songFileName = ?", [filename.slice(0, -4)]),
     "Error while checking the covers owner"
   )
 
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "Cover not found"})
-  if (dbUser[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
+  if (!dbUser) return res.status(404).json({success: false, message: "Cover not found"})
+  if (dbUser.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
   
   res.status(200).sendFile(`${process.cwd()}/songs/cover/${filename}`)
 }
@@ -254,32 +290,32 @@ export async function editSong(req, res) {
   const cover = req.files.cover
   checkReq(!songId)
 
-  const [dbSong] = await safeOperation(
+  const [[dbSong]] = await safeOperation(
     () => db.query("select songFileName, fk_UserDataId from Songs where songId = ?", [songId]),
     "Error while fetching song from database"
   )
 
-  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
-  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
   await safeOperation(
     async () => {
       if (artistDelete) {
         for (const artist of JSON.parse(artistDelete)) {
-          const [dbArtist] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
-          if (dbArtist.length === 0) return res.status(404).json({success: false, message: "Artist to delete not found"})
-          await db.query("delete from SongArtists where fk_SongId = ? and fk_ArtistId = ?", [songId, dbArtist[0].artistId])
+          const [[dbArtist]] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
+          if (!dbArtist) return res.status(404).json({success: false, message: "Artist to delete not found"})
+          await db.query("delete from SongArtists where fk_SongId = ? and fk_ArtistId = ?", [songId, dbArtist.artistId])
         }
       }
       if (artistAdd) {
         for (const artist of JSON.parse(artistAdd)) {
           let artistId = 0
-          const [dbArtist] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
-          if (dbArtist.length === 0) {
+          const [[dbArtist]] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
+          if (!dbArtist) {
             const [artistResult] = await db.query("insert into Artists (artistName) values (?)", [artist])
             artistId = artistResult.insertId
           } else {
-            artistId = dbArtist[0].artistId
+            artistId = dbArtist.artistId
           }
           await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [songId, artistId])
         }
@@ -288,7 +324,7 @@ export async function editSong(req, res) {
       if (genre) await db.query("update Songs set genre = ? where songId = ?", [genre, songId])
       if (releaseYear) await db.query("update Songs set releaseYear = ? where songId = ?", [releaseYear, songId])
       if (cover) {
-        const coverFilepath = `./songs/cover/${dbSong[0].songFileName}.jpg`
+        const coverFilepath = `./songs/cover/${dbSong.songFileName}.jpg`
 
         await unlink(coverFilepath)
         await sharp(cover[0].filepath).jpeg().toFile(coverFilepath)
@@ -305,17 +341,17 @@ export async function deleteSong(req, res) {
   const {songId} = req.body
   checkReq(!songId)
 
-  const [dbSong] = await safeOperation(
+  const [[dbSong]] = await safeOperation(
     () => db.query("select fk_UserDataId, songFileName from Songs where songId = ?", [songId]),
     "Error while fetching song owner"
   )
 
-  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
-  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
   
   await safeOperations([
-    () => unlink(`./songs/audio/${dbSong[0].songFileName}.m4a`),
-    () => unlink(`./songs/cover/${dbSong[0].songFileName}.jpg`)
+    () => unlink(`./songs/audio/${dbSong.songFileName}.m4a`),
+    () => unlink(`./songs/cover/${dbSong.songFileName}.jpg`)
   ], "Error while deleting song files")
 
   await safeOperation(
@@ -331,15 +367,15 @@ export async function toggleFavorite(req, res) {
   const {songId} = req.body
   checkReq(!songId)
 
-  const [dbSong] = await safeOperation(
+  const [[dbSong]] = await safeOperation(
     () => db.query("select fk_UserDataId, isFavorite from Songs where songId = ?", [songId]),
     "Error while fetching song owner"
   )
 
-  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
-  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
-  const setValue = !Boolean(dbSong[0].isFavorite)
+  const setValue = !Boolean(dbSong.isFavorite)
   await safeOperation(
     () => db.query("update Songs set isFavorite = ? where songId = ?", [setValue, songId]),
     "Error while toggling favorite on song"
@@ -353,16 +389,16 @@ export async function resetSong(req, res) {
   const {songId} = req.body
   checkReq(!songId)
 
-  const [dbSong] = await safeOperation(
+  const [[dbSong]] = await safeOperation(
     () => db.query("select fk_UserDataId, songFileName from Songs where songId = ?", [songId]),
     "Error while fetching song owner"
   )
 
-  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
-  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
   
   const metadata = await safeOperation(
-    () => parseFile(`./songs/audio/${dbSong[0].songFileName}.m4a`),
+    () => parseFile(`./songs/audio/${dbSong.songFileName}.m4a`),
     "Error while reading metadata"
   )
 
@@ -373,19 +409,19 @@ export async function resetSong(req, res) {
   const artistIds = []
   if (splitArtists.length > 0) {
     for (const artist of splitArtists) {
-      const [dbArtist] = await safeOperation(
+      const [[dbArtist]] = await safeOperation(
         () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist]),
         "Error while selecting artist from the database"
       )
 
-      if (dbArtist.length === 0) {
+      if (!dbArtist) {
         const [artistResult] = await safeOperation(
           () => db.query("insert into Artists (artistName) values (?)", [artist]),
           "Error while inserting new artist"
         )
         artistIds.push(artistResult.insertId)
       } else {
-        artistIds.push(dbArtist[0].artistId) 
+        artistIds.push(dbArtist.artistId) 
       }
     }
   }
@@ -406,7 +442,7 @@ export async function resetSong(req, res) {
 			if (metadata.common.picture && metadata.common.picture.length > 0) {
 				const cover = common.picture[0]
 				const convertedCover = await sharp(cover.data).jpeg().toBuffer()
-				const coverFilepath = `./songs/cover/${dbSong[0].songFileName}.jpg`
+				const coverFilepath = `./songs/cover/${dbSong.songFileName}.jpg`
 
 				await unlink(coverFilepath)
 				await writeFile(coverFilepath, convertedCover)

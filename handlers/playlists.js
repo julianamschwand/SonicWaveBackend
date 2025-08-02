@@ -38,20 +38,20 @@ export async function editPlaylist(req, res) {
   const cover = req.files.cover
   checkReq(!playlistId)
 
-  const [dbPlaylist] = await safeOperation(
+  const [[dbPlaylist]] = await safeOperation(
     () => db.query("select playlistCoverFileName, fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
     "Error while fetching playlist from database"
   )
 
-  if (dbPlaylist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
-  if (dbPlaylist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+  if (!dbPlaylist) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (dbPlaylist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
   await safeOperation(
     async () => {
       if (name) await db.query("update Playlists set playlistName = ? where playlistId = ?", [name, playlistId])
       if (description) await db.query("update Playlists set playlistDescription = ? where playlistId = ?", [description, playlistId])
       if (cover) {
-        const coverFilepath = `./playlist-covers/${dbPlaylist[0].playlistCoverFileName}.jpg`
+        const coverFilepath = `./playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`
 
         await unlink(coverFilepath)
         await sharp(cover[0].filepath).jpeg().toFile(coverFilepath)
@@ -68,18 +68,18 @@ export async function deletePlaylist(req, res) {
   const {playlistId} = req.body
   checkReq(!playlistId)
 
-  const [dbPlaylist] = await safeOperation(
+  const [[dbPlaylist]] = await safeOperation(
     () => db.query("select playlistCoverFileName, fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
     "Error while fetching playlist from database"
   )
 
-  if (dbPlaylist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
-  if (dbPlaylist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+  if (!dbPlaylist) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (dbPlaylist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
   await safeOperation(
     async () => {
       await db.query("delete from Playlists where playlistId = ?", [playlistId])
-      await unlink(`./playlist-covers/${dbPlaylist[0].playlistCoverFileName}`)
+      await unlink(`./playlist-covers/${dbPlaylist.playlistCoverFileName}`)
     },
     "Error while deleting playlist"
   )
@@ -92,21 +92,21 @@ export async function addToPlaylist(req, res) {
   const {playlistId, songId} = req.body
   checkReq(!playlistId || !songId)
 
-  const [dbPlaylist] = await safeOperation(
+  const [[dbPlaylist]] = await safeOperation(
     () => db.query("select fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
     "Error while fetching playlist from database"
   )
 
-  if (dbPlaylist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
-  if (dbPlaylist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+  if (!dbPlaylist) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (dbPlaylist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
-  const [dbSong] = await safeOperation(
+  const [[dbSong]] = await safeOperation(
     () => db.query("select fk_UserDataId from Songs where songId = ?", [songId]),
     "Error while fetching song from database"
   )
 
-  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
-  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
   await safeOperation(
     () => db.query("insert into PlaylistSongs (fk_PlaylistId, fk_SongId) values (?,?)", [playlistId, songId]),
@@ -121,28 +121,28 @@ export async function deleteFromPlaylist(req, res) {
   const {playlistId, songId} = req.body
   checkReq(!playlistId || !songId)
 
-  const [dbPlaylist] = await safeOperation(
+  const [[dbPlaylist]] = await safeOperation(
     () => db.query("select fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
     "Error while fetching playlist from database"
   )
 
-  if (dbPlaylist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
-  if (dbPlaylist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+  if (!dbPlaylist) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (dbPlaylist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
-  const [dbSong] = await safeOperation(
+  const [[dbSong]] = await safeOperation(
     () => db.query("select fk_UserDataId from Songs where songId = ?", [songId]),
     "Error while fetching song from database"
   )
 
-  if (dbSong.length === 0) return res.status(404).json({success: false, message: "Song not found"})
-  if (dbSong[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
+  if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
+  if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
-  const [dbPlaylistSong] = await safeOperation(
+  const [[dbPlaylistSong]] = await safeOperation(
     () => db.query("select * from PlayListSongs where fk_PlaylistId = ? and fk_SongId = ?", [playlistId, songId]),
     "Error while getting the playlist song"
   )
 
-  if (dbPlaylistSong.length === 0) return res.status(404).json({success: false, message: "Song is not in playlist"})
+  if (!dbPlaylistSong) return res.status(404).json({success: false, message: "Song is not in playlist"})
   
   await safeOperation(
     () => db.query("delete from PlaylistSongs where fk_PlaylistId = ? and fk_SongId = ?", [playlistId, songId]),
@@ -179,13 +179,13 @@ export async function playlist(req, res) {
   const {playlistId} = req.query
   checkReq(!playlistId)
 
-  const [playlist] = await safeOperation(
+  const [[playlist]] = await safeOperation(
     () => db.query(`select * from Playlists where playlistId = ?`, [playlistId]),
     "Error while fetching playlist from database"
   )
 
-  if (playlist.length === 0) return res.status(404).json({success: false, message: "Playlist not found"})
-  if (playlist[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+  if (!playlist) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (playlist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
   const [songs] = await safeOperation(
     () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, 
@@ -233,13 +233,13 @@ export async function playlist(req, res) {
 export async function getCover(req, res) {
   const filename = req.params.filename
 
-  const [dbUser] = await safeOperation(
+  const [[dbUser]] = await safeOperation(
     () => db.query("select fk_UserDataId from Playlists where playlistCoverFileName = ?", [filename.slice(0, -4)]),
     "Error while checking the covers owner"
   )
 
-  if (dbUser.length === 0) return res.status(404).json({success: false, message: "Cover not found"})
-  if (dbUser[0].fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
+  if (!dbUser) return res.status(404).json({success: false, message: "Cover not found"})
+  if (dbUser.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
   
   res.status(200).sendFile(`${process.cwd()}/playlist-covers/${filename}`)
 }

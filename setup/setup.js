@@ -5,13 +5,12 @@ import { extract } from 'tar'
 import { promises as readlinePromises} from 'readline' 
 import { queryRootDB } from './root-db.js'
 import { randomBytes } from 'crypto'
-import { platform } from 'os'
 import { createWriteStream, existsSync } from 'fs'
 import { chmod, mkdir, writeFile, readFile, rename, rm, access } from 'fs/promises'
 
 async function setupWizard() {
   // checking os
-  const os = platform()
+  const os = process.platform
 
   if (os !== "linux" && os !== "win32" && os !== "darwin") {
     console.warn("Unsupported os")

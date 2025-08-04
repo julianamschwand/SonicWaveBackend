@@ -80,6 +80,10 @@ export async function downloadSong(req, res) {
   const filename = randomUUID()
   const songpath = `./songs/audio/${filename}.m4a`
 
+  const cropFilter = process.platform === "win32" ?
+    "if(gt(ih\\\\,iw)\\\\,iw\\\\,ih):if(gt(iw\\\\,ih)\\\\,ih\\\\,iw)" :
+    "if(gt(ih\\,iw)\\,iw\\,ih):if(gt(iw\\,ih)\\,ih\\,iw)"
+
   const {stderr} = await safeOperation(
     () => exec(`"${process.env.YTDLP_PATH}"` +
               ` -x` +
@@ -89,6 +93,9 @@ export async function downloadSong(req, res) {
               ` --embed-metadata` +
               ` --embed-thumbnail` +
               ` --add-metadata` +
+              ` --no-playlist` +
+              ` --convert-thumbnails jpg` +
+              ` --ppa "ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=${cropFilter}"` +
               ` -o "${songpath}"` +
               ` "${songURL}"`),
     "Error while downloading the song"
@@ -126,10 +133,8 @@ export async function downloadSong(req, res) {
     }
   }
 
-  if (metadata.common.picture && metadata.common.picture.length > 0) {
-    const cover = common.picture[0]
-    const convertedCover = await sharp(cover.data).jpeg().toBuffer()
-    await writeFile(`./songs/cover/${filename}.jpg`, convertedCover)
+  if (common.picture && common.picture.length > 0) {
+    await writeFile(`./songs/cover/${filename}.jpg`, common.picture[0].data)
   } else {
     const randomNumber = Math.floor(Math.random() * 6) + 1
     await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./songs/cover/${filename}.jpg`)
@@ -439,13 +444,11 @@ export async function resetSong(req, res) {
   
 	await safeOperation(
 		async () => {
-			if (metadata.common.picture && metadata.common.picture.length > 0) {
-				const cover = common.picture[0]
-				const convertedCover = await sharp(cover.data).jpeg().toBuffer()
+			if (common.picture && common.picture.length > 0) {
 				const coverFilepath = `./songs/cover/${dbSong.songFileName}.jpg`
 
 				await unlink(coverFilepath)
-				await writeFile(coverFilepath, convertedCover)
+				await writeFile(coverFilepath, common.picture[0].data)
 			} else {
 				const randomNumber = Math.floor(Math.random() * 6) + 1
 				await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./songs/cover/${filename}.jpg`)

@@ -155,8 +155,13 @@ export async function deleteFromPlaylist(req, res) {
 // get all playlists without songs
 export async function allPlaylists(req, res) {
   const [playlists] = await safeOperation(
-    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName from Playlists 
-                    where fk_UserDataId = ? order by playlistName`, [req.session.user.id]),
+    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as playlistLength
+                    from Playlists
+                    left join PlaylistSongs on playlistId = fk_PlaylistId
+                    left join Songs on songId = fk_SongId
+                    where Playlists.fk_UserDataId = ?
+                    group by playlistId, playlistName, playlistDescription, playlistCoverFileName
+                    order by playlistName`, [req.session.user.id]),
     "Error while fetching playlists from database"
   )
 
@@ -167,6 +172,8 @@ export async function allPlaylists(req, res) {
       playlistId: playlist.playlistId,
       name: playlist.playlistName,
       description: playlist.playlistDescription,
+      playlistLength: playlist.playlistLength || 0,
+      songCount: playlist.songCount,
       cover: coverURL
     }
   })

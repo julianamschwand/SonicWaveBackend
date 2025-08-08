@@ -61,7 +61,7 @@ app.use("/playlists", playlistRouter)
 app.use("/queue", queueRouter)
 
 // serve default covers
-app.use("/default-images/songs", express.static("./default-images/songs"))
+app.use("/default-images", express.static("./default-images"))
 
 // serve on port
 const port = process.env.PORT

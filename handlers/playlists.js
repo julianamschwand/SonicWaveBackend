@@ -207,7 +207,7 @@ export async function playlist(req, res) {
     "Error while fetching playlist songs from the database"
   )
 
-  const playlistCoverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist[0].playlistCoverFileName}.jpg`
+  const playlistCoverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.jpg`
 
   const formattedSongs = songs.map(song => {
     const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
@@ -226,9 +226,9 @@ export async function playlist(req, res) {
   })
 
   const responseObject = {
-    playlistId: playlist[0].playlistId,
-    name: playlist[0].playlistName,
-    description: playlist[0].playlistDescription,
+    playlistId: playlist.playlistId,
+    name: playlist.playlistName,
+    description: playlist.playlistDescription,
     cover: playlistCoverURL,
     songs: formattedSongs
   }

@@ -155,7 +155,7 @@ export async function deleteFromPlaylist(req, res) {
 // get all playlists without songs
 export async function allPlaylists(req, res) {
   const [playlists] = await safeOperation(
-    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as playlistLength
+    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as playlistDuration
                     from Playlists
                     left join PlaylistSongs on playlistId = fk_PlaylistId
                     left join Songs on songId = fk_SongId
@@ -172,7 +172,7 @@ export async function allPlaylists(req, res) {
       playlistId: playlist.playlistId,
       name: playlist.playlistName,
       description: playlist.playlistDescription,
-      playlistLength: playlist.playlistLength || 0,
+      playlistDuration: Number(playlist.playlistDuration) || 0,
       songCount: playlist.songCount,
       cover: coverURL
     }
@@ -187,7 +187,13 @@ export async function playlist(req, res) {
   checkReq(!playlistId)
 
   const [[playlist]] = await safeOperation(
-    () => db.query(`select * from Playlists where playlistId = ?`, [playlistId]),
+    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as playlistDuration, Playlists.fk_UserDataId
+                    from Playlists
+                    left join PlaylistSongs on playlistId = fk_PlaylistId
+                    left join Songs on songId = fk_SongId
+                    where playlistId = ?
+                    group by playlistId, playlistName, playlistDescription, playlistCoverFileName
+                    order by playlistName`, [playlistId]),
     "Error while fetching playlist from database"
   )
 
@@ -230,6 +236,8 @@ export async function playlist(req, res) {
     name: playlist.playlistName,
     description: playlist.playlistDescription,
     cover: playlistCoverURL,
+    songCount: playlist.songCount,
+    playlistDuration: Number(playlist.playlistDuration) || 0,
     songs: formattedSongs
   }
 

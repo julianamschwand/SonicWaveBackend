@@ -214,8 +214,8 @@ export async function song(req, res) {
     () => db.query(`select title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, fk_UserDataId, 
                     json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
                     from Songs
-                    join SongArtists on fk_SongId = songId
-                    join Artists on fk_ArtistId = artistId
+                    left join SongArtists on fk_SongId = songId
+                    left join Artists on fk_ArtistId = artistId
                     where fk_UserDataId = ? and songId = ?
                     group by songId`, [req.session.user.id, songId]),
     "Error while fetching song from database"
@@ -237,6 +237,8 @@ export async function song(req, res) {
     cover: coverURL,
     artists: JSON.parse(song.artists)
   }
+
+  if (!formattedSong.artists[0].artistId) formattedSong.artists = []
 
   res.status(200).json({success: true, message: "Successfully retrieved song from database", song: formattedSong})
 }

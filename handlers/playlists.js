@@ -87,10 +87,10 @@ export async function deletePlaylist(req, res) {
   res.status(200).json({success: true, message: "Successfully deleted the playlist"})
 }
 
-// add a song to the playlist
+// add songs to the playlist
 export async function addToPlaylist(req, res) {
-  const {playlistId, songId} = req.body
-  checkReq(!playlistId || !songId)
+  const {playlistId, songIds} = req.body
+  checkReq(!playlistId || !songIds || songIds?.length === 0)
 
   const [[dbPlaylist]] = await safeOperation(
     () => db.query("select fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
@@ -100,20 +100,27 @@ export async function addToPlaylist(req, res) {
   if (!dbPlaylist) return res.status(404).json({success: false, message: "Playlist not found"})
   if (dbPlaylist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
-  const [[dbSong]] = await safeOperation(
-    () => db.query("select fk_UserDataId from Songs where songId = ?", [songId]),
-    "Error while fetching song from database"
+  const conditions = songIds.map(() => "songId = ?").join(" or ")
+  const userQuery = "select fk_UserDataId from Songs where " + conditions
+
+  const [dbSongs] = await safeOperation(
+    () => db.query(userQuery, songIds),
+    "Error while fetching songs from database"
   )
 
-  if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
-  if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
-
+  const songUsers = dbSongs.map(dbSong => dbSong.fk_UserDataId)
+  if (songUsers.some(userId => userId !== req.session.user.id)) return res.status(403).json({success: false, message: "Not your song"})
+  
+  const placeholders = songIds.map(() => "(?,?)").join(",")
+  const values = songIds.flatMap(songId => [playlistId, songId])
+  const songQuery = "insert into PlaylistSongs (fk_PlaylistId, fk_SongId) values " + placeholders
+  
   await safeOperation(
-    () => db.query("insert into PlaylistSongs (fk_PlaylistId, fk_SongId) values (?,?)", [playlistId, songId]),
-    "Error while inserting the song into the playlist"
+    () => db.query(songQuery, values),
+    "Error while inserting the songs into the playlist"
   )
 
-  res.status(200).json({success: true, message: "Successfully added song to playlist"})
+  res.status(200).json({success: true, message: "Successfully added songs to playlist"})
 }
 
 // delete a song from the playlist

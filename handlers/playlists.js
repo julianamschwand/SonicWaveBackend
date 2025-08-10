@@ -49,7 +49,7 @@ export async function editPlaylist(req, res) {
   await safeOperation(
     async () => {
       if (name) await db.query("update Playlists set playlistName = ? where playlistId = ?", [name, playlistId])
-      if (description) await db.query("update Playlists set playlistDescription = ? where playlistId = ?", [description, playlistId])
+      if (description || description === "") await db.query("update Playlists set playlistDescription = ? where playlistId = ?", [description, playlistId])
       if (cover) {
         const coverFilepath = `./playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`
 
@@ -79,7 +79,7 @@ export async function deletePlaylist(req, res) {
   await safeOperation(
     async () => {
       await db.query("delete from Playlists where playlistId = ?", [playlistId])
-      await unlink(`./playlist-covers/${dbPlaylist.playlistCoverFileName}`)
+      await unlink(`./playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`)
     },
     "Error while deleting playlist"
   )

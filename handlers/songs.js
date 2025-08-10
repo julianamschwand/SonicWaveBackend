@@ -247,8 +247,8 @@ export async function songs(req, res) {
     () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, 
                     json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
                     from Songs
-                    join SongArtists on fk_SongId = songId
-                    join Artists on fk_ArtistId = artistId
+                    left join SongArtists on fk_SongId = songId
+                    left join Artists on fk_ArtistId = artistId
                     where fk_UserDataId = ?
                     group by songId 
                     order by title`, [req.session.user.id]),
@@ -326,7 +326,7 @@ export async function editSong(req, res) {
         }
       } 
       if (title) await db.query("update Songs set title = ? where songId = ?", [title, songId])
-      if (genre) await db.query("update Songs set genre = ? where songId = ?", [genre, songId])
+      if (genre || genre === "") await db.query("update Songs set genre = ? where songId = ?", [genre, songId])
       if (releaseYear) await db.query("update Songs set releaseYear = ? where songId = ?", [releaseYear, songId])
       if (cover) {
         const coverFilepath = `./songs/cover/${dbSong.songFileName}.jpg`

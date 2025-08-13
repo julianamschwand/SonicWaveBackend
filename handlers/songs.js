@@ -117,13 +117,13 @@ export async function downloadSong(req, res) {
   if (splitArtists.length > 0) {
     for (const artist of splitArtists) {
       const [dbArtist] = await safeOperation(
-        () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist]),
+        () => db.query("select artistId from Artists where lower(artistName) = lower(?) and fk_UserDataId = ?", [artist, req.session.user.id]),
         "Error while selecting artist from the database"
       )
 
       if (dbArtist.length === 0) {
         const [artistResult] = await safeOperation(
-          () => db.query("insert into Artists (artistName) values (?)", [artist]),
+          () => db.query("insert into Artists (artistName, fk_UserDataId) values (?,?)", [artist, req.session.user.id]),
           "Error while inserting new artist"
         )
         artistIds.push(artistResult.insertId)
@@ -211,13 +211,13 @@ export async function song(req, res) {
   checkReq(!songId)
 
   const [[song]] = await safeOperation(
-    () => db.query(`select title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, fk_UserDataId, 
+    () => db.query(`select title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, Songs.fk_UserDataId, 
                     json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId
-                    where fk_UserDataId = ? and songId = ?
-                    group by songId`, [req.session.user.id, songId]),
+                    where songId = ?
+                    group by songId`, [songId]),
     "Error while fetching song from database"
   )
 
@@ -251,7 +251,7 @@ export async function songs(req, res) {
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId
-                    where fk_UserDataId = ?
+                    where Songs.fk_UserDataId = ?
                     group by songId 
                     order by title`, [req.session.user.id]),
     "Error while fetching songs from database"
@@ -309,7 +309,7 @@ export async function editSong(req, res) {
     async () => {
       if (artistDelete) {
         for (const artist of JSON.parse(artistDelete)) {
-          const [[dbArtist]] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
+          const [[dbArtist]] = await db.query("select artistId from Artists where lower(artistName) = lower(?) and fk_UserDataId = ?", [artist, req.session.user.id])
           if (!dbArtist) return res.status(404).json({success: false, message: "Artist to delete not found"})
           await db.query("delete from SongArtists where fk_SongId = ? and fk_ArtistId = ?", [songId, dbArtist.artistId])
         }
@@ -317,9 +317,9 @@ export async function editSong(req, res) {
       if (artistAdd) {
         for (const artist of JSON.parse(artistAdd)) {
           let artistId = 0
-          const [[dbArtist]] = await db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist])
+          const [[dbArtist]] = await db.query("select artistId from Artists where lower(artistName) = lower(?) and fk_UserDataId = ?", [artist, req.session.user.id])
           if (!dbArtist) {
-            const [artistResult] = await db.query("insert into Artists (artistName) values (?)", [artist])
+            const [artistResult] = await db.query("insert into Artists (artistName, fk_UserDataId) values (?,?)", [artist, req.session.user.id])
             artistId = artistResult.insertId
           } else {
             artistId = dbArtist.artistId
@@ -417,13 +417,13 @@ export async function resetSong(req, res) {
   if (splitArtists.length > 0) {
     for (const artist of splitArtists) {
       const [[dbArtist]] = await safeOperation(
-        () => db.query("select artistId from Artists where lower(artistName) = lower(?)", [artist]),
+        () => db.query("select artistId from Artists where lower(artistName) = lower(?) and fk_UserDataId = ?", [artist, req.session.user.id]),
         "Error while selecting artist from the database"
       )
 
       if (!dbArtist) {
         const [artistResult] = await safeOperation(
-          () => db.query("insert into Artists (artistName) values (?)", [artist]),
+          () => db.query("insert into Artists (artistName, fk_UserDataId) values (?,?)", [artist, req.session.user.id]),
           "Error while inserting new artist"
         )
         artistIds.push(artistResult.insertId)

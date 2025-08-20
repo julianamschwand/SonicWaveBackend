@@ -22,7 +22,7 @@ export async function allUsers(req, res) {
 // get the userdata from a single user
 export async function userdata(req, res) { 
   const [[user]] = await safeOperation( 
-    () => db.query("select username, email, userRole from UserData where userDataId = ?", [req.session.user.id]),
+    () => db.query("select userDataId, username, email, userRole from UserData where userDataId = ?", [req.session.user.id]),
     "Error while retrieving userdata from the database"
   )
   
@@ -99,7 +99,7 @@ export async function loginState(req, res) {
 export async function changePassword(req, res) {
   const {email, passwordOld, passwordNew, otp} = req.body
   let userDataId = undefined
-  if (req.session.user.id) userDataId = req.session.user.id
+  if (req.session.user?.id) userDataId = req.session.user.id
   checkReq((!userDataId && !email) || (!passwordOld && !otp) || !passwordNew)
   
   if (!userDataId) {
@@ -204,7 +204,7 @@ export async function deleteUser(req, res) {
   if (!dbUser) return res.status(404).json({success: false, message: "User not found"})
   if (reqUser.userRole === "user" && dbUser.userDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Only admins and the owner can delete users other than themself"})
   if (dbUser.userRole === "owner") return res.status(403).json({success: false, message: "Can't delete owner"})
-  if (dbUser.userRole === "admin" && reqUser.userRole !== "owner") return res.status(403).json({success: false, message: "Can only delete admins as owner"})
+  if (dbUser.userRole === "admin" && reqUser.userRole !== "owner" && dbUser.userDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Only the owner or the account owner can delete an admin"})
   
   await safeOperation(
     () => db.query("delete from UserData where userDataId = ?", [userDataId]),

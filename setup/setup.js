@@ -113,31 +113,30 @@ async function setupWizard() {
   const paths = {}
 
   const urls = {
-    win32_ytdlp: ["https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe", "yt-dlp_win32.exe"],
-    linux_ytdlp: ["https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux", "yt-dlp_linux"],
-    darwin_ytdlp: ["https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos", "yt-dlp_macos"],
-    win32_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-win32.exe", "spotdl_win32.exe"],
-    linux_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-linux", "spotdl_linux"],
-    darwin_spotdl: ["https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-darwin", "spotdl_darwin"],
-    win32_ffmpeg: ["https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-7.1.zip", "ffmpeg_win32"],
-    linux_ffmpeg: ["https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-linux64-gpl-7.1.tar.xz", "ffmpeg_linux"],
-    darwin_ffmpeg: ["https://evermeet.cx/ffmpeg/get/zip", "ffmpeg_macos"]
+    win32_ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+    linux_ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
+    darwin_ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
+    win32_spotdl: "https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-win32.exe",
+    linux_spotdl: "https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-linux",
+    darwin_spotdl: "https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-darwin",
+    win32_ffmpeg: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-7.1.zip",
+    linux_ffmpeg: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-linux64-gpl-7.1.tar.xz",
+    darwin_ffmpeg: "https://evermeet.cx/ffmpeg/get/zip"
   }
 
   for (const download of downloads) {
     const key = `${os}_${download}`
 
-    const [url, filename] = urls[key]
+    const url = urls[key]
     const downloadname = url.split("/").pop()
     const downloadpath = `./bin/${downloadname}`
-    console.log(downloadname)
 
     if (!url) {
       console.warn(`No binary available for ${download} on ${os}. This will break base functionality`)
       continue
     }
 
-    paths[download] = `./bin/${filename}`
+    paths[download] = `./bin/${downloadname}`
     
     console.log(`Downloading ${download} ...`)
 
@@ -165,22 +164,13 @@ async function setupWizard() {
         const zip = new AdmZip(downloadpath)
         zip.extractAllTo("./bin/", true)
         await rm(downloadpath)
-        await rename(downloadpath.slice(0, -4), `./bin/${filename}`)
       } else if (fileSuffix === "xz") {
         await extract({
           file: downloadpath,
           C: "./bin/"
         })
         await rm(downloadpath)
-        await rename(downloadpath.slice(0, -7), `./bin/${filename}`)
       }
-    }
-
-    try {
-      await access(downloadpath)
-      await rename(downloadpath, `./bin/${filename}`)
-    } catch (error) {
-      continue
     }
   }
   
@@ -235,7 +225,7 @@ async function setupWizard() {
   `SPOTIFY_CLIENT_SECRET="${spotifyClientSecret}"\n`*/
 
   for (const [key, value] of Object.entries(paths)) {
-    envContent += `\n${key.toUpperCase()}_PATH="${value}${key === "ffmpeg" ? "/bin" : ""}"`
+    envContent += `\n${key.toUpperCase()}_PATH="${key === "ffmpeg" ? value.slice(0, -4) + "/bin" : value}"`
   }
 
   await writeFile("./.env", envContent, "utf-8")

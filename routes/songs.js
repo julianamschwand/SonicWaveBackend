@@ -16,5 +16,6 @@ songRouter.patch("/edit", checkAuth, upload("./songs/cover"), routeWrapper(songH
 songRouter.delete("/delete", checkAuth, routeWrapper(songHandlers.deleteSong))
 songRouter.post("/toggle-favorite", checkAuth, routeWrapper(songHandlers.toggleFavorite))
 songRouter.put("/reset", checkAuth, routeWrapper(songHandlers.resetSong))
+songRouter.get("/recently-played", checkAuth, routeWrapper(songHandlers.recentlyPlayed))
 
 export default songRouter

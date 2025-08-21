@@ -33,7 +33,7 @@ async function setupWizard() {
   await mkdir("./bin", { recursive: true })
   await mkdir("./songs/audio", { recursive: true })
   await mkdir("./songs/cover", { recursive: true })
-  await mkdir("./playlist-folders", { recursive: true })
+  await mkdir("./playlist-covers", { recursive: true })
 
   // ask for db credentials
   const rootPass = await input.question("Enter your MariaDB / MySQL root password: ")

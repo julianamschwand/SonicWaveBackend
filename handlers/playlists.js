@@ -208,7 +208,7 @@ export async function playlist(req, res) {
   if (playlist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
 
   const [songs] = await safeOperation(
-    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, 
+    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, 
                     json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
                     from Songs
                     join SongArtists on SongArtists.fk_SongId = songId
@@ -232,7 +232,6 @@ export async function playlist(req, res) {
       duration: song.duration,
       releaseYear: song.releaseYear,
       isFavorite: Boolean(song.isFavorite),
-      lastPlayed: song.lastPlayed,
       cover: coverURL,
       artists: JSON.parse(song.artists)
     }

@@ -12,6 +12,7 @@ import userRouter from './routes/users.js'
 import songRouter from './routes/songs.js'
 import playlistRouter from './routes/playlists.js'
 import queueRouter from './routes/queue.js'
+import artistRouter from './routes/artists.js'
 
 import cleanup from './middleware/cleanup.js'
 
@@ -59,9 +60,10 @@ app.use("/users", userRouter)
 app.use("/songs", songRouter)
 app.use("/playlists", playlistRouter)
 app.use("/queue", queueRouter)
+app.use("/artists", artistRouter)
 
 // serve default covers
-app.use("/default-images", express.static("./default-images"))
+app.use("/default-images", express.static("./data/default-images"))
 
 // serve on port
 const port = process.env.PORT

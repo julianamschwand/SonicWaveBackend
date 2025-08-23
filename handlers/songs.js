@@ -31,7 +31,7 @@ export async function playSong(req, res) {
     "Error while updating last played timestamp"
   )
 
-	const songPath = `./songs/audio/${dbSong.songFileName}.m4a`
+	const songPath = `./data/songs/audio/${dbSong.songFileName}.m4a`
 	const songStat = await safeOperation(
     () => stat(songPath),
     "Error while fetching song stats"
@@ -137,7 +137,7 @@ export async function downloadSong(req, res) {
     await writeFile(`./songs/cover/${filename}.jpg`, common.picture[0].data)
   } else {
     const randomNumber = Math.floor(Math.random() * 6) + 1
-    await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./songs/cover/${filename}.jpg`)
+    await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./data/songs/cover/${filename}.jpg`)
   }
 
   const [result] = await safeOperation(
@@ -286,7 +286,7 @@ export async function getCover(req, res) {
   if (!dbUser) return res.status(404).json({success: false, message: "Cover not found"})
   if (dbUser.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
   
-  res.status(200).sendFile(`${process.cwd()}/songs/cover/${filename}`)
+  res.status(200).sendFile(`${process.cwd()}/data/songs/cover/${filename}`)
 }
 
 // edit an existing songs metadata
@@ -329,7 +329,7 @@ export async function editSong(req, res) {
       if (genre || genre === "") await db.query("update Songs set genre = ? where songId = ?", [genre, songId])
       if (releaseYear) await db.query("update Songs set releaseYear = ? where songId = ?", [releaseYear, songId])
       if (cover) {
-        const coverFilepath = `./songs/cover/${dbSong.songFileName}.jpg`
+        const coverFilepath = `./data/songs/cover/${dbSong.songFileName}.jpg`
 
         await unlink(coverFilepath)
         await sharp(cover[0].filepath).jpeg().toFile(coverFilepath)
@@ -355,8 +355,8 @@ export async function deleteSong(req, res) {
   if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
   
   await safeOperations([
-    () => unlink(`./songs/audio/${dbSong.songFileName}.m4a`),
-    () => unlink(`./songs/cover/${dbSong.songFileName}.jpg`)
+    () => unlink(`./data/songs/audio/${dbSong.songFileName}.m4a`),
+    () => unlink(`./data/songs/cover/${dbSong.songFileName}.jpg`)
   ], "Error while deleting song files")
 
   await safeOperation(
@@ -445,7 +445,7 @@ export async function resetSong(req, res) {
 	await safeOperation(
 		async () => {
 			if (common.picture && common.picture.length > 0) {
-				const coverFilepath = `./songs/cover/${dbSong.songFileName}.jpg`
+				const coverFilepath = `./data/songs/cover/${dbSong.songFileName}.jpg`
 
 				await unlink(coverFilepath)
 				await writeFile(coverFilepath, common.picture[0].data)

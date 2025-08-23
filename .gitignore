@@ -1,6 +1,7 @@
 node_modules
 .env
 bin
-/songs
+/data/songs
 playlist-covers
 .vscode
+artist-images

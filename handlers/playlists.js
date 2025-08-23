@@ -17,7 +17,7 @@ export async function createPlaylist(req, res) {
         await sharp(cover[0].filepath).jpeg().toFile(`./playlist-covers/${filename}.jpg`)
       } else {
         const randomNumber = Math.floor(Math.random() * 6) + 1
-        await copyFile(`./default-images/playlists/${randomNumber}.jpg`, `./playlist-covers/${filename}.jpg`)
+        await copyFile(`./data/default-images/playlists/${randomNumber}.jpg`, `./playlist-covers/${filename}.jpg`)
       }
     },
     "Error while saving cover"
@@ -51,7 +51,7 @@ export async function editPlaylist(req, res) {
       if (name) await db.query("update Playlists set playlistName = ? where playlistId = ?", [name, playlistId])
       if (description || description === "") await db.query("update Playlists set playlistDescription = ? where playlistId = ?", [description, playlistId])
       if (cover) {
-        const coverFilepath = `./playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`
+        const coverFilepath = `./data/playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`
 
         await unlink(coverFilepath)
         await sharp(cover[0].filepath).jpeg().toFile(coverFilepath)
@@ -79,7 +79,7 @@ export async function deletePlaylist(req, res) {
   await safeOperation(
     async () => {
       await db.query("delete from Playlists where playlistId = ?", [playlistId])
-      await unlink(`./playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`)
+      await unlink(`./data/playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`)
     },
     "Error while deleting playlist"
   )
@@ -262,5 +262,5 @@ export async function getCover(req, res) {
   if (!dbUser) return res.status(404).json({success: false, message: "Cover not found"})
   if (dbUser.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
   
-  res.status(200).sendFile(`${process.cwd()}/playlist-covers/${filename}`)
+  res.status(200).sendFile(`${process.cwd()}/data/playlist-covers/${filename}`)
 }

@@ -21,6 +21,7 @@ create table Artists (
   artistId int unsigned primary key auto_increment,
   artistName varchar(100) unique,
   artistDescription text,
+  artistImageFileName char(36),
   fk_UserDataId int unsigned,
   foreign key (fk_UserDataId) references UserData(userDataId) on delete cascade
 );
@@ -29,7 +30,7 @@ create table Songs (
   songId int unsigned primary key auto_increment,
   songFileName char(36) unique,
   title varchar(100),
-  genre varchar(20),
+  genre varchar(100),
   duration int,
   releaseYear year,
   isFavorite boolean default false,

@@ -97,7 +97,6 @@ async function setupWizard() {
       ${setupScript}
       insert into UserData (username, email, passwordHash, userRole, approved) 
       values ('${ownerName}','${ownerEmail}','${hashedOwnerPassword}','owner',true);
-      insert into Artists (artistName, artistDescription) values ('Unknown','Unknown artist');
       drop user if exists 'SonicWaveUser'@'localhost';
       create user 'SonicWaveUser'@'${dbHost}' identified by '${userPass}';
       grant all privileges on SonicWave.* to 'SonicWaveUser'@'${dbHost}';

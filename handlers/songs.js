@@ -78,7 +78,7 @@ export async function downloadSong(req, res) {
   checkReq(!songURL)
 
   const filename = randomUUID()
-  const songpath = `./songs/audio/${filename}.m4a`
+  const songpath = `./data/songs/audio/${filename}.m4a`
 
   const cropFilter = process.platform === "win32" ?
     "if(gt(ih\\\\,iw)\\\\,iw\\\\,ih):if(gt(iw\\\\,ih)\\\\,ih\\\\,iw)" :
@@ -122,10 +122,11 @@ export async function downloadSong(req, res) {
       )
 
       if (dbArtist.length === 0) {
-        const [artistResult] = await safeOperation(
-          () => db.query("insert into Artists (artistName, fk_UserDataId) values (?,?)", [artist, req.session.user.id]),
-          "Error while inserting new artist"
-        )
+        const artistImageFileName = randomUUID()
+        const [artistResult] = await safeOperation([
+          () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
+          () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
+        ], "Error while inserting new artist")
         artistIds.push(artistResult.insertId)
       } else {
         artistIds.push(dbArtist[0].artistId) 
@@ -134,10 +135,10 @@ export async function downloadSong(req, res) {
   }
 
   if (common.picture && common.picture.length > 0) {
-    await writeFile(`./songs/cover/${filename}.jpg`, common.picture[0].data)
+    await writeFile(`./data/songs/cover/${filename}.jpg`, common.picture[0].data)
   } else {
     const randomNumber = Math.floor(Math.random() * 6) + 1
-    await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./data/songs/cover/${filename}.jpg`)
+    await copyFile(`./data/default-images/songs/${randomNumber}.jpg`, `./data/songs/cover/${filename}.jpg`)
   }
 
   const [result] = await safeOperation(
@@ -243,7 +244,7 @@ export async function song(req, res) {
 }
 
 // get all songs
-export async function songs(req, res) {
+export async function allSongs(req, res) {
   const [songs] = await safeOperation(
     () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, 
                     json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
@@ -322,7 +323,9 @@ export async function editSong(req, res) {
           } else {
             artistId = dbArtist.artistId
           }
-          await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [songId, artistId])
+          const artistImageFileName = randomUUID()
+          await db.query("insert into SongArtists (fk_SongId, artistImageFileName, fk_ArtistId) values (?,?,?)", [songId, artistImageFileName, artistId])
+          await copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
         }
       } 
       if (title) await db.query("update Songs set title = ? where songId = ?", [title, songId])
@@ -420,10 +423,11 @@ export async function resetSong(req, res) {
       )
 
       if (!dbArtist) {
-        const [artistResult] = await safeOperation(
-          () => db.query("insert into Artists (artistName, fk_UserDataId) values (?,?)", [artist, req.session.user.id]),
-          "Error while inserting new artist"
-        )
+        const artistImageFileName = randomUUID()
+        const [artistResult] = await safeOperation([
+          () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
+          () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
+        ], "Error while inserting new artist")
         artistIds.push(artistResult.insertId)
       } else {
         artistIds.push(dbArtist.artistId) 
@@ -451,7 +455,7 @@ export async function resetSong(req, res) {
 				await writeFile(coverFilepath, common.picture[0].data)
 			} else {
 				const randomNumber = Math.floor(Math.random() * 6) + 1
-				await copyFile(`./default-images/songs/${randomNumber}.jpg`, `./songs/cover/${filename}.jpg`)
+				await copyFile(`./data/default-images/songs/${randomNumber}.jpg`, `./data/songs/cover/${filename}.jpg`)
 			}
 		},
 		"Error while resetting the cover"

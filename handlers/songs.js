@@ -123,7 +123,7 @@ export async function downloadSong(req, res) {
 
       if (dbArtist.length === 0) {
         const artistImageFileName = randomUUID()
-        const [artistResult] = await safeOperation([
+        const [artistResult] = await safeOperations([
           () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
           () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
         ], "Error while inserting new artist")
@@ -318,14 +318,14 @@ export async function editSong(req, res) {
           let artistId = 0
           const [[dbArtist]] = await db.query("select artistId from Artists where lower(artistName) = lower(?) and fk_UserDataId = ?", [artist, req.session.user.id])
           if (!dbArtist) {
-            const [artistResult] = await db.query("insert into Artists (artistName, fk_UserDataId) values (?,?)", [artist, req.session.user.id])
+            const artistImageFileName = randomUUID()
+            const [artistResult] = await db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id])
+            await copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
             artistId = artistResult.insertId
           } else {
             artistId = dbArtist.artistId
           }
-          const artistImageFileName = randomUUID()
-          await db.query("insert into SongArtists (fk_SongId, artistImageFileName, fk_ArtistId) values (?,?,?)", [songId, artistImageFileName, artistId])
-          await copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
+          await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [songId, artistId])
         }
       } 
       if (title) await db.query("update Songs set title = ? where songId = ?", [title, songId])

@@ -30,7 +30,7 @@ create table Songs (
   songId int unsigned primary key auto_increment,
   songFileName char(36) unique,
   title varchar(100),
-  genre varchar(100),
+  genre varchar(20),
   duration int,
   releaseYear year,
   isFavorite boolean default false,

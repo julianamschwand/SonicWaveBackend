@@ -123,7 +123,7 @@ export async function downloadSong(req, res) {
 
       if (dbArtist.length === 0) {
         const artistImageFileName = randomUUID()
-        const [artistResult] = await safeOperations([
+        const [[artistResult]] = await safeOperations([
           () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
           () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
         ], "Error while inserting new artist")
@@ -479,7 +479,7 @@ export async function recentlyPlayed(req, res) {
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId
-                    where Songs.fk_UserDataId = ?
+                    where Songs.fk_UserDataId = ? and lastPlayed != "null"
                     group by songId 
                     order by lastPlayed desc
                     limit 20`, [req.session.user.id]),

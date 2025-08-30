@@ -17,7 +17,7 @@ export async function createPlaylist(req, res) {
         await sharp(cover[0].filepath).jpeg().toFile(`./playlist-covers/${filename}.jpg`)
       } else {
         const randomNumber = Math.floor(Math.random() * 6) + 1
-        await copyFile(`./data/default-images/playlists/${randomNumber}.jpg`, `./playlist-covers/${filename}.jpg`)
+        await copyFile(`./data/default-images/playlists/${randomNumber}.jpg`, `./data/playlist-covers/${filename}.jpg`)
       }
     },
     "Error while saving cover"

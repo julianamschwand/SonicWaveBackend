@@ -1,7 +1,7 @@
 import { db } from '../db/db.js'
 import { unlink } from 'fs/promises'
 import sharp from 'sharp'
-import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
+import { safeOperation, checkReq } from '../error-handling.js'
 
 
 export async function allArtists(req, res) {
@@ -35,9 +35,10 @@ export async function singleArtist(req, res) {
   checkReq(!artistId)
 
   const [[artist]] = await safeOperation(
-    () => db.query(`select artistId, artistName, artistDescription, artistImageFileName, count(songArtistId) as songCount, fk_UserDataId
+    () => db.query(`select artistId, artistName, artistDescription, artistImageFileName, count(songArtistId) as songCount, sum(duration) as artistDuration, Artists.fk_UserDataId
                     from Artists
-                    left join SongArtists on artistId = fk_ArtistId 
+                    left join SongArtists on artistId = fk_ArtistId
+                    left join Songs on songId = fk_SongId
                     where artistId = ?
                     group by artistId, artistName, artistDescription, artistImageFileName
                     order by count(songArtistId) desc, artistName`, [artistId]),
@@ -53,7 +54,7 @@ export async function singleArtist(req, res) {
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId
-                    where artistId = ?
+                    where songId in (select songId from SongArtists where fk_ArtistId = ?)
                     group by songId 
                     order by title`, [artistId]),
     "Error while fetching songs from database"
@@ -80,6 +81,7 @@ export async function singleArtist(req, res) {
     name: artist.artistName,
     description: artist.artistDescription,
     songCount: artist.songCount,
+    duration: artist.artistDuration,
     image: imageURL,
     songs: formattedSongs
   }

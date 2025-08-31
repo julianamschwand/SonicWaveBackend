@@ -54,7 +54,7 @@ export async function singleArtist(req, res) {
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId
-                    where songId in (select songId from SongArtists where fk_ArtistId = ?)
+                    where songId in (select fk_SongId from SongArtists where fk_ArtistId = ?)
                     group by songId 
                     order by title`, [artistId]),
     "Error while fetching songs from database"

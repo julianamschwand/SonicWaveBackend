@@ -318,7 +318,7 @@ export async function editSong(req, res) {
       if (artistAdd) {
         for (const artist of JSON.parse(artistAdd)) {
           let artistId = 0
-          const [[dbArtist]] = await db.query("select artistId from Artists where lower(artistName) = lower(?) and fk_UserDataId = ?", [artist, req.session.user.id])
+          const [[dbArtist]] = await db.query("select artistId, artistName from Artists where lower(artistName) = lower(?) and fk_UserDataId = ?", [artist, req.session.user.id])
           if (!dbArtist) {
             const artistImageFileName = randomUUID()
             const [artistResult] = await db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id])
@@ -327,7 +327,7 @@ export async function editSong(req, res) {
           } else {
             artistId = dbArtist.artistId
           }
-          newArtists.push({artistId: artistId, name: artist})
+          newArtists.push({artistId: artistId, name: dbArtist ? dbArtist.artistName : artist})
           await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [songId, artistId])
         }
       } 

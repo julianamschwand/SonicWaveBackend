@@ -5,7 +5,7 @@ import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
 export async function getQueue(req, res) {
   const [queue] = await safeOperation(
     () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, 
-                    json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
+                    json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from QueuedSongs
                     join Songs on QueuedSongs.fk_SongId = songId
                     join SongArtists on SongArtists.fk_SongId = songId

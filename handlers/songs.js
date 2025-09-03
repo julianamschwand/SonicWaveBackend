@@ -213,7 +213,7 @@ export async function song(req, res) {
 
   const [[song]] = await safeOperation(
     () => db.query(`select title, genre, duration, releaseYear, isFavorite, songFileName, Songs.fk_UserDataId, 
-                    json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
+                    json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId
@@ -247,7 +247,7 @@ export async function song(req, res) {
 export async function allSongs(req, res) {
   const [songs] = await safeOperation(
     () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, 
-                    json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
+                    json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId
@@ -304,6 +304,8 @@ export async function editSong(req, res) {
   if (!dbSong) return res.status(404).json({success: false, message: "Song not found"})
   if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
+  const newArtists = []
+
   await safeOperation(
     async () => {
       if (artistDelete) {
@@ -325,6 +327,7 @@ export async function editSong(req, res) {
           } else {
             artistId = dbArtist.artistId
           }
+          newArtists.push({artistId: artistId, name: artist})
           await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [songId, artistId])
         }
       } 
@@ -341,7 +344,7 @@ export async function editSong(req, res) {
     "Error while updating song metadata"
   )
 
-  res.status(200).json({success: true, message: "Successfully edited the song"})
+  res.status(200).json({success: true, message: "Successfully edited the song", ...(artistAdd ? {newArtists: newArtists} : {})})
 }
 
 // delete a song
@@ -475,7 +478,7 @@ export async function resetSong(req, res) {
 export async function recentlyPlayed(req, res) {
   const [songs] = await safeOperation(
     () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, 
-                    json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
+                    json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId

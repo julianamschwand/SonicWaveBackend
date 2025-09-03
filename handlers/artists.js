@@ -50,7 +50,7 @@ export async function singleArtist(req, res) {
 
   const [songs] = await safeOperation(
     () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, 
-                    json_arrayagg(json_object('artistId', artistId, 'artistName', artistName)) as artists
+                    json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId
                     left join Artists on fk_ArtistId = artistId

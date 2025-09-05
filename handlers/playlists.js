@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { unlink, copyFile } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, checkReq } from '../error-handling.js'
+import { formatSongs } from '../functions.js'
 
 // make a new playlist
 export async function createPlaylist(req, res) {
@@ -222,21 +223,6 @@ export async function playlist(req, res) {
 
   const playlistCoverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.jpg`
 
-  const formattedSongs = songs.map(song => {
-    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
-
-    return {
-      songId: song.songId,
-      title: song.title,
-      genre: song.genre,
-      duration: song.duration,
-      releaseYear: song.releaseYear,
-      isFavorite: Boolean(song.isFavorite),
-      cover: coverURL,
-      artists: JSON.parse(song.artists)
-    }
-  })
-
   const responseObject = {
     playlistId: playlist.playlistId,
     name: playlist.playlistName,
@@ -244,7 +230,7 @@ export async function playlist(req, res) {
     cover: playlistCoverURL,
     songCount: playlist.songCount,
     playlistDuration: Number(playlist.playlistDuration) || 0,
-    songs: formattedSongs
+    songs: formatSongs(req, songs)
   }
 
   res.status(200).json({success: true, message: "Successfully retrieved playlist from database", playlist: responseObject})

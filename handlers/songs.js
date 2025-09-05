@@ -9,6 +9,7 @@ import { createReadStream } from 'fs'
 import { unlink, writeFile, copyFile, stat } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
+import { formatSongs } from '../functions.js'
 dotenv.config()
 
 const exec = util.promisify(execCb)
@@ -212,7 +213,7 @@ export async function song(req, res) {
   checkReq(!songId)
 
   const [[song]] = await safeOperation(
-    () => db.query(`select title, genre, duration, releaseYear, isFavorite, songFileName, Songs.fk_UserDataId, 
+    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, Songs.fk_UserDataId, 
                     json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId
@@ -225,22 +226,7 @@ export async function song(req, res) {
   if (!song) return res.status(404).json({success: false, message: "Song not found"})
   if (song.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
   
-  const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
-  
-  const formattedSong = {
-    songId: song.songId,
-    title: song.title,
-    genre: song.genre,
-    duration: song.duration,
-    releaseYear: song.releaseYear,
-    isFavorite: Boolean(song.isFavorite),
-    cover: coverURL,
-    artists: JSON.parse(song.artists)
-  }
-
-  if (!formattedSong.artists[0].artistId) formattedSong.artists = []
-
-  res.status(200).json({success: true, message: "Successfully retrieved song from database", song: formattedSong})
+  res.status(200).json({success: true, message: "Successfully retrieved song from database", song: formatSongs(req, [song])[0]})
 }
 
 // get all songs
@@ -257,22 +243,7 @@ export async function allSongs(req, res) {
     "Error while fetching songs from database"
   )
 
-  const formattedSongs = songs.map(song => {
-    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
-
-    return {
-      songId: song.songId,
-      title: song.title,
-      genre: song.genre,
-      duration: song.duration,
-      releaseYear: song.releaseYear,
-      isFavorite: Boolean(song.isFavorite),
-      cover: coverURL,
-      artists: JSON.parse(song.artists)
-    }
-  })
-
-  res.status(200).json({success: true, message: "Successfully retrieved songs from database", songs: formattedSongs})
+  res.status(200).json({success: true, message: "Successfully retrieved songs from database", songs: formatSongs(req, songs)})
 }
 
 // get cover image

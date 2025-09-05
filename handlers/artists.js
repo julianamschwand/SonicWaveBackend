@@ -2,6 +2,7 @@ import { db } from '../db/db.js'
 import { unlink } from 'fs/promises'
 import sharp from 'sharp'
 import { safeOperation, checkReq } from '../error-handling.js'
+import { formatSongs } from '../functions.js'
 
 
 export async function allArtists(req, res) {
@@ -60,21 +61,6 @@ export async function singleArtist(req, res) {
     "Error while fetching songs from database"
   )
 
-  const formattedSongs = songs.map(song => {
-    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
-
-    return {
-      songId: song.songId,
-      title: song.title,
-      genre: song.genre,
-      duration: song.duration,
-      releaseYear: song.releaseYear,
-      isFavorite: Boolean(song.isFavorite),
-      cover: coverURL,
-      artists: JSON.parse(song.artists)
-    }
-  })
-
   const imageURL = `${req.protocol}://${req.get('host')}/artists/image/${artist.artistImageFileName}.jpg`
   const formattedArtist = {
     artistId: artist.artistId,
@@ -83,7 +69,7 @@ export async function singleArtist(req, res) {
     songCount: artist.songCount,
     duration: artist.artistDuration,
     image: imageURL,
-    songs: formattedSongs
+    songs: formatSongs(req, songs)
   }
 
   res.status(200).json({success: true, message: "Successfully retrieved artist from database", artist: formattedArtist})

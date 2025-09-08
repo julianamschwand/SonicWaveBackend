@@ -4,35 +4,13 @@ import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
 // get the current queue of songs
 export async function getQueue(req, res) {
   const [queue] = await safeOperation(
-    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, lastPlayed, songFileName, 
-                    json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
-                    from QueuedSongs
-                    join Songs on QueuedSongs.fk_SongId = songId
-                    join SongArtists on SongArtists.fk_SongId = songId
-                    join Artists on fk_ArtistId = artistId
-                    where QueuedSongs.fk_UserDataId = ?
-                    group by songId 
-                    order by queuedSongId`, [req.session.user.id]),
+    () => db.query(`select fk_SongId from QueuedSongs where fk_UserDataId = ?`, [req.session.user.id]),
     "Error while fetching queue from database"
   )
 
+  const formattedQueue = queue.map(queuedSong => queuedSong.fk_SongId)
+
   if (queue.length === 0) return res.status(200).json({success: true, message: "The queue is empty", queue: queue})
-
-  const formattedQueue = queue.map(song => {
-    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
-
-    return {
-      songId: song.songId,
-      title: song.title,
-      genre: song.genre,
-      duration: song.duration,
-      releaseYear: song.releaseYear,
-      isFavorite: Boolean(song.isFavorite),
-      lastPlayed: song.lastPlayed,
-      cover: coverURL,
-      artists: JSON.parse(song.artists)
-    }
-  })
 
   const [[queueIndex]] = await safeOperation(
     () => db.query("select queueIndex from UserData where userDataId = ?", [req.session.user.id]),

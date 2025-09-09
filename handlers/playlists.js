@@ -163,7 +163,7 @@ export async function deleteFromPlaylist(req, res) {
 // get all playlists without songs
 export async function allPlaylists(req, res) {
   const [playlists] = await safeOperation(
-    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as playlistDuration
+    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as playlistDuration, json_arrayagg(songId) as songs
                     from Playlists
                     left join PlaylistSongs on playlistId = fk_PlaylistId
                     left join Songs on songId = fk_SongId
@@ -175,6 +175,7 @@ export async function allPlaylists(req, res) {
 
   const formattedPlaylists = playlists.map(playlist => {
     const coverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.jpg`
+    const parsedSongs = JSON.parse(playlist.songs)
 
     return {
       playlistId: playlist.playlistId,
@@ -182,7 +183,8 @@ export async function allPlaylists(req, res) {
       description: playlist.playlistDescription,
       playlistDuration: Number(playlist.playlistDuration) || 0,
       songCount: playlist.songCount,
-      cover: coverURL
+      cover: coverURL,
+      songs: parsedSongs[0] ? parsedSongs : []
     }
   })
 

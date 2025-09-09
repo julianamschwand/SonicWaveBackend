@@ -7,10 +7,11 @@ import { formatSongs } from '../functions.js'
 
 export async function allArtists(req, res) {
   const [artists] = await safeOperation(
-    () => db.query(`select artistId, artistName, artistDescription, artistImageFileName, count(songArtistId) as songCount
+    () => db.query(`select artistId, artistName, artistDescription, artistImageFileName, count(songArtistId) as songCount, json_arrayagg(songId) as songs
                     from Artists
                     join SongArtists on artistId = fk_ArtistId 
-                    where fk_UserDataId = ?
+                    left join Songs on songId = fk_SongId
+                    where Artists.fk_UserDataId = ?
                     group by artistId, artistName, artistDescription, artistImageFileName
                     order by count(songArtistId) desc, artistName`, [req.session.user.id]),
     "Error while fetching artists from database"
@@ -18,13 +19,15 @@ export async function allArtists(req, res) {
 
   const formattedArtists = artists.map(artist => {
     const imageURL = `${req.protocol}://${req.get('host')}/artists/image/${artist.artistImageFileName}.jpg`
+    const parsedSongs = JSON.parse(artist.songs)
 
     return {
       artistId: artist.artistId,
       name: artist.artistName,
       description: artist.artistDescription,
       songCount: artist.songCount,
-      image: imageURL
+      image: imageURL,
+      songs: parsedSongs[0] ? parsedSongs : []
     }
   })
 

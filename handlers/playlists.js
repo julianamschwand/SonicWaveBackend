@@ -219,7 +219,7 @@ export async function playlist(req, res) {
                     join PlaylistSongs on PlaylistSongs.fk_SongId = songId
                     where fk_PlaylistId = ?
                     group by songId 
-                    order by title`, [playlistId]),
+                    order by playlistSongId`, [playlistId]),
     "Error while fetching playlist songs from the database"
   )
 

@@ -15,3 +15,24 @@ export function formatSongs(req, songs) {
     }
   })
 }
+
+export function formatPlaylists(req, playlists, songs) {
+  return playlists.map(playlist => {
+    const coverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.jpg`
+
+    let parsedSongs = []
+    if (!songs) parsedSongs = JSON.parse(playlist.songs)
+
+    return {
+      ...{
+        playlistId: playlist.playlistId,
+        name: playlist.playlistName,
+        description: playlist.playlistDescription,
+        playlistDuration: Number(playlist.playlistDuration) || 0,
+        songCount: playlist.songCount,
+        cover: coverURL,
+      },
+      songs: !songs ? (parsedSongs[0] ? parsedSongs : []) : formatSongs(req, songs)
+    }
+  })
+}

@@ -3,13 +3,16 @@ import { randomUUID } from 'crypto'
 import { unlink, copyFile } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, checkReq } from '../error-handling.js'
-import { formatSongs } from '../functions.js'
+import { formatPlaylists } from '../functions.js'
 
 // make a new playlist
 export async function createPlaylist(req, res) {
   const {name, description} = req.body
   const cover = req.files.cover
   checkReq(!name)
+
+  const stringName = name[0]
+  const stringDescription = description ? description[0] : ""
 
   const filename = randomUUID()
   await safeOperation(
@@ -24,13 +27,25 @@ export async function createPlaylist(req, res) {
     "Error while saving cover"
   )
   
-  await safeOperation(
+  const result = await safeOperation(
     () => db.query(`insert into Playlists (playlistName, playlistDescription, playlistCoverFileName, fk_UserDataId)
-                   values (?,?,?,?)`, [name, description, filename, req.session.user.id]),
+                   values (?,?,?,?)`, [stringName, stringDescription, filename, req.session.user.id]),
     "Error while inserting playlist into database"
   )
 
-  res.status(200).json({success: true, message: "Successfully created playlist"})
+  const coverUrl = `${req.protocol}://${req.get('host')}/playlists/cover/${filename}.jpg`
+
+  const playlist = {
+    playlistId: result.insertId,
+    name: stringName,
+    description: stringDescription,
+    songCount: 0,
+    playlistDuration: 0,
+    cover: coverUrl,
+    songs: []
+  }
+
+  res.status(200).json({success: true, message: "Successfully created playlist", playlist: playlist})
 }
 
 // edit an existing playlists metadata
@@ -173,22 +188,7 @@ export async function allPlaylists(req, res) {
     "Error while fetching playlists from database"
   )
 
-  const formattedPlaylists = playlists.map(playlist => {
-    const coverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.jpg`
-    const parsedSongs = JSON.parse(playlist.songs)
-
-    return {
-      playlistId: playlist.playlistId,
-      name: playlist.playlistName,
-      description: playlist.playlistDescription,
-      playlistDuration: Number(playlist.playlistDuration) || 0,
-      songCount: playlist.songCount,
-      cover: coverURL,
-      songs: parsedSongs[0] ? parsedSongs : []
-    }
-  })
-
-  res.status(200).json({success: true, message: "Successfully retrieved playlists from database", playlists: formattedPlaylists})
+  res.status(200).json({success: true, message: "Successfully retrieved playlists from database", playlists: formatPlaylists(req, playlists)})
 }
 
 // get a single playlist with songs
@@ -223,19 +223,7 @@ export async function playlist(req, res) {
     "Error while fetching playlist songs from the database"
   )
 
-  const playlistCoverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.jpg`
-
-  const responseObject = {
-    playlistId: playlist.playlistId,
-    name: playlist.playlistName,
-    description: playlist.playlistDescription,
-    cover: playlistCoverURL,
-    songCount: playlist.songCount,
-    playlistDuration: Number(playlist.playlistDuration) || 0,
-    songs: formatSongs(req, songs)
-  }
-
-  res.status(200).json({success: true, message: "Successfully retrieved playlist from database", playlist: responseObject})
+  res.status(200).json({success: true, message: "Successfully retrieved playlist from database", playlist: formatPlaylists(req, [playlist], songs)[0]})
 }
 
 // get cover image

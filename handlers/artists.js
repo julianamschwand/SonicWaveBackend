@@ -7,7 +7,7 @@ import { formatSongs } from '../functions.js'
 
 export async function allArtists(req, res) {
   const [artists] = await safeOperation(
-    () => db.query(`select artistId, artistName, artistDescription, artistImageFileName, count(songArtistId) as songCount, json_arrayagg(songId) as songs
+    () => db.query(`select artistId, artistName, artistDescription, artistImageFileName, count(songArtistId) as songCount, sum(duration) as duration, json_arrayagg(songId) as songs
                     from Artists
                     join SongArtists on artistId = fk_ArtistId 
                     left join Songs on songId = fk_SongId
@@ -26,6 +26,7 @@ export async function allArtists(req, res) {
       name: artist.artistName,
       description: artist.artistDescription,
       songCount: artist.songCount,
+      duration: Number(artist.duration) || 0,
       image: imageURL,
       songs: parsedSongs[0] ? parsedSongs : []
     }
@@ -60,7 +61,7 @@ export async function singleArtist(req, res) {
                     left join Artists on fk_ArtistId = artistId
                     where songId in (select fk_SongId from SongArtists where fk_ArtistId = ?)
                     group by songId 
-                    order by title`, [artistId]),
+                    order by songArtistId`, [artistId]),
     "Error while fetching songs from database"
   )
 

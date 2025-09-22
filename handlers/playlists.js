@@ -178,7 +178,7 @@ export async function deleteFromPlaylist(req, res) {
 // get all playlists without songs
 export async function allPlaylists(req, res) {
   const [playlists] = await safeOperation(
-    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as playlistDuration, json_arrayagg(songId) as songs
+    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as duration, json_arrayagg(songId) as songs
                     from Playlists
                     left join PlaylistSongs on playlistId = fk_PlaylistId
                     left join Songs on songId = fk_SongId
@@ -197,7 +197,7 @@ export async function playlist(req, res) {
   checkReq(!playlistId)
 
   const [[playlist]] = await safeOperation(
-    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as playlistDuration, Playlists.fk_UserDataId
+    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as duration, Playlists.fk_UserDataId
                     from Playlists
                     left join PlaylistSongs on playlistId = fk_PlaylistId
                     left join Songs on songId = fk_SongId

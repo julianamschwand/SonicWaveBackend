@@ -28,7 +28,7 @@ export function formatPlaylists(req, playlists, songs) {
         playlistId: playlist.playlistId,
         name: playlist.playlistName,
         description: playlist.playlistDescription,
-        playlistDuration: Number(playlist.playlistDuration) || 0,
+        duration: Number(playlist.duration) || 0,
         songCount: playlist.songCount,
         cover: coverURL,
       },

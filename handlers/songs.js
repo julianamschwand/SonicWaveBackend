@@ -213,7 +213,7 @@ export async function song(req, res) {
   checkReq(!songId)
 
   const [[song]] = await safeOperation(
-    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, Songs.fk_UserDataId, 
+    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, Songs.fk_UserDataId, lastPlayed, 
                     json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId
@@ -232,7 +232,7 @@ export async function song(req, res) {
 // get all songs
 export async function allSongs(req, res) {
   const [songs] = await safeOperation(
-    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, 
+    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, lastPlayed,
                     json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId
@@ -444,36 +444,3 @@ export async function resetSong(req, res) {
 
   res.status(200).json({success: true, message: "Successfully reset the song metadata"})
 } 
-
-// get the 20 most recently played songs
-export async function recentlyPlayed(req, res) {
-  const [songs] = await safeOperation(
-    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, 
-                    json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
-                    from Songs
-                    left join SongArtists on fk_SongId = songId
-                    left join Artists on fk_ArtistId = artistId
-                    where Songs.fk_UserDataId = ? and lastPlayed != "null"
-                    group by songId 
-                    order by lastPlayed desc
-                    limit 20`, [req.session.user.id]),
-    "Error while fetching songs from database"
-  )
-
-  const formattedSongs = songs.map(song => {
-    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
-
-    return {
-      songId: song.songId,
-      title: song.title,
-      genre: song.genre,
-      duration: song.duration,
-      releaseYear: song.releaseYear,
-      isFavorite: Boolean(song.isFavorite),
-      cover: coverURL,
-      artists: JSON.parse(song.artists)
-    }
-  })
-
-  res.status(200).json({success: true, message: "Successfully got the most recently played songs", songs: formattedSongs})
-}

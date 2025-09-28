@@ -10,6 +10,7 @@ export function formatSongs(req, songs) {
       duration: song.duration,
       releaseYear: song.releaseYear,
       isFavorite: Boolean(song.isFavorite),
+      lastPlayed: song.lastPlayed,
       cover: coverURL,
       artists: parsedArtists[0].artistId ? parsedArtists : []
     }

@@ -196,7 +196,7 @@ export async function browseSongs(req, res) {
       
       return {
         title: cleanTitle,
-        artist: cleanArtist,
+        artists: [{name: cleanArtist}],
         genre: cleanGenre,
         url,
         cover: coverURL?.[1] || defaultCoverURL,

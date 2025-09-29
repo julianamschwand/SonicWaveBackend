@@ -10,7 +10,7 @@ create table UserData (
 
 create table Playlists (
   playlistId int unsigned primary key auto_increment,
-  playlistName varchar(50),
+  playlistName varchar(100),
   playlistDescription text,
   playlistCoverFileName char(36),
   fk_UserDataId int unsigned,

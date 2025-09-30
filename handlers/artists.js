@@ -54,7 +54,7 @@ export async function singleArtist(req, res) {
   if (artist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your artist"})
 
   const [songs] = await safeOperation(
-    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, 
+    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, lastPlayed, 
                     json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
                     from Songs
                     left join SongArtists on fk_SongId = songId

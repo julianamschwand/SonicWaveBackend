@@ -380,7 +380,7 @@ export async function resetSong(req, res) {
   if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
   
   const metadata = await safeOperation(
-    () => parseFile(`./songs/audio/${dbSong.songFileName}.m4a`),
+    () => parseFile(`./data/songs/audio/${dbSong.songFileName}.m4a`),
     "Error while reading metadata"
   )
 
@@ -442,5 +442,16 @@ export async function resetSong(req, res) {
     "Error while updating the song metadata"
   )
 
-  res.status(200).json({success: true, message: "Successfully reset the song metadata"})
+  const [[resetSong]] = await safeOperation(
+    () => db.query(`select songId, title, genre, duration, releaseYear, isFavorite, songFileName, Songs.fk_UserDataId, lastPlayed, 
+                    json_arrayagg(json_object('artistId', artistId, 'name', artistName)) as artists
+                    from Songs
+                    left join SongArtists on fk_SongId = songId
+                    left join Artists on fk_ArtistId = artistId
+                    where songId = ?
+                    group by songId`, [songId]),
+    "Error while fetching reset song from database"
+  )
+
+  res.status(200).json({success: true, message: "Successfully reset the song metadata", song: formatSongs(req, [resetSong])[0]})
 } 

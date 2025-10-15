@@ -83,7 +83,7 @@ async function setupWizard() {
 
     let setupScript = ""
     try {
-      setupScript = await readFile("./db/db-setup.sql", "utf-8");
+      setupScript = await readFile("./db/db-setup.sql", "utf-8")
     } catch (error) {
       console.error("Error while reading db-setup.sql")
     }
@@ -173,6 +173,12 @@ async function setupWizard() {
       }
     }
   }
+
+  // saving yt-dlp version as a file so it can be automatically updated
+  const ytdlpVersionResponse = await axios.get("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")
+  const ytdlpVersion = ytdlpVersionResponse.data.tag_name
+
+  await writeFile("./bin/yt-dlp-version", ytdlpVersion, "utf-8")
   
   // asking for additional ENV information
   let nodeEnvAnswer = ""

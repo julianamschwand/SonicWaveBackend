@@ -112,7 +112,7 @@ export async function downloadSong(req, res) {
   const common = metadata.common
   const format = metadata.format
 
-  const splitArtists = common.artist.split("，").map(artist => artist.trim())
+  const splitArtists = common.artist?.split("，").map(artist => artist.trim()) || ""
 
   const artistIds = []
   if (splitArtists.length > 0) {
@@ -163,48 +163,81 @@ export async function downloadSong(req, res) {
 
 // browse songs with soundcloud
 export async function browseSongs(req, res) {
-  const {query} = req.query
-  checkReq(!query)
+  const {query, site} = req.query
+  checkReq(!query || !site)
+
+  let searchURL = ""
+  let regex = null
+
+  switch (site) {
+    case "soundcloud":
+      searchURL = `https://soundcloud.com/search?q=${query}`
+      regex = /<h2><a href="(\/[^\/]+\/[^\/]+)">/g
+      break
+    case "newgrounds":
+      searchURL = `https://www.newgrounds.com/search/conduct/audio?suitabilities=etma&c=3&terms=${query}`
+      regex = /<a href="[^"]+" class="item-audiosubmission\s*" title="[^"]+">.+?<\/a>/gs
+      break
+  }
 
   const searchPage = await safeOperation(
-    () => axios.get(`https://soundcloud.com/search?q=${query}`),
+    () => axios.get(searchURL),
     "Error while getting search page"
   )
-
-  const regex = /<h2><a href="(\/[^\/]+\/[^\/]+)">/g
+  
   const filtered = [...searchPage.data.matchAll(regex)]
 
-  const structured = await Promise.all(
+  const structuredSongs = await Promise.all(
     filtered.map(async match => {
-      const url = "https://soundcloud.com" + match[1]
+      let title = ""
+      let artist = ""
+      let genre = ""
+      let url = ""
+      let coverURL = ""
+
+      switch (site) {
+        case "soundcloud":
+          url = "https://soundcloud.com" + match[1]
   
-      const songPage = await safeOperation(
-        () => axios.get(url),
-        "Error while getting song page"
-      )
+          const songPage = await safeOperation(
+            () => axios.get(url),
+            "Error while getting song page"
+          )
 
-      const coverURL = /<img src="([^"]+)"/.exec(songPage.data)
-      const titleAndArtist = /<h1 itemprop="name"><a itemprop="url" href="[^"]+">([^<]+)<\/a>\s*by\s*<a[^>]+>([^<]+)/.exec(songPage.data)
-      const genre = /"genre" content="([^"]+)"/.exec(songPage.data)
+          const titleAndArtistMatch = /<h1 itemprop="name"><a itemprop="url" href="[^"]+">([^<]+)<\/a>\s*by\s*<a[^>]+>([^<]+)/.exec(songPage.data)
+          coverURL = /<img src="([^"]+)"/.exec(songPage.data)
+          genre = /"genre" content="([^"]+)"/.exec(songPage.data)?.[1]
 
-      const cleanTitle = (titleAndArtist?.[1] || "Unknown Title").replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "")
-      const cleanArtist = (titleAndArtist?.[2] || "Unknown Artist").replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "")
-      const cleanGenre = (genre?.[1] || "(None)").replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "")
+          title = titleAndArtistMatch?.[1]
+          artist = titleAndArtistMatch?.[2]
+          break
+        case "newgrounds":
+          title = /title="([^"]+)/.exec(match[0])?.[1]
+          artist = /<strong>([^<]+)/.exec(match[0])?.[1]
+          genre = /<dl>\s*<dd>.*?<\/dd>\s*<dd>(.*?)<\/dd>/.exec(match[0])?.[1]
+          url = /href="([^"]+)/.exec(match[0])?.[1]
+          coverURL = /src="([^"]+)/.exec(match[0])
 
-      const randomNumber = Math.floor(Math.random() * 6) + 1
-      const defaultCoverURL = `${req.protocol}://${req.get('host')}/default-images/songs/${randomNumber}.jpg`
+          if (!isNaN(Number(genre[0]))) genre = null
+          break
+      }
+
+      const cleanTitle = title ? (title).replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "") : title
+      const cleanArtist = artist ? (artist).replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "") : artist
+      const cleanGenre = genre ? (genre).replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "") : genre
+      const defaultCoverURL = `${req.protocol}://${req.get('host')}/default-images/songs/${Math.floor(Math.random() * 6) + 1}.jpg`
       
       return {
         title: cleanTitle,
         artists: [{name: cleanArtist}],
         genre: cleanGenre,
-        url,
+        url: url,
         cover: coverURL?.[1] || defaultCoverURL,
       }
     })
   )
 
-  res.status(200).json({success: true, message: "Successfully fetched songs", songs: structured})
+  res.status(200).json({success: true, message: "Successfully fetched songs", songs: structuredSongs})
 }
 
 // get a single song
@@ -398,7 +431,7 @@ export async function resetSong(req, res) {
 
       if (!dbArtist) {
         const artistImageFileName = randomUUID()
-        const [artistResult] = await safeOperation([
+        const [artistResult] = await safeOperations([
           () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
           () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
         ], "Error while inserting new artist")

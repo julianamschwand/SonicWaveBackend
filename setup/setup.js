@@ -5,8 +5,8 @@ import { extract } from 'tar'
 import { promises as readlinePromises} from 'readline' 
 import { queryRootDB } from './root-db.js'
 import { randomBytes } from 'crypto'
-import { createWriteStream, existsSync } from 'fs'
-import { chmod, mkdir, writeFile, readFile, rename, rm, access } from 'fs/promises'
+import { createWriteStream } from 'fs'
+import { chmod, mkdir, writeFile, readFile, rm } from 'fs/promises'
 
 async function setupWizard() {
   // checking os

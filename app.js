@@ -7,6 +7,7 @@ import { existsSync } from 'fs'
 import setupWizard from './setup/setup.js'
 import { createSessionStore } from "./db/db.js"
 import { smtpVerifier } from './mailer.js'
+import initCronJobs from './cron/index.js'
 
 import userRouter from './routes/users.js'
 import songRouter from './routes/songs.js'
@@ -48,6 +49,9 @@ app.use(session({
     maxAge: 1000 * 60 * 60 * 24 * 7
   }
 }))
+
+// initialize cron jobs
+await initCronJobs()
 
 // upload cleanup
 app.use(cleanup)

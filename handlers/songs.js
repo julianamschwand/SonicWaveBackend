@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto'
 import { exec as execCb } from 'child_process'
 import { parseFile } from 'music-metadata'
 import { createReadStream } from 'fs'
-import { unlink, writeFile, copyFile, stat } from 'fs/promises'
+import { unlink, writeFile, copyFile, stat, readdir, rename, rm, rmdir } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
 import { formatSongs } from '../functions.js'
@@ -149,16 +149,164 @@ export async function downloadSong(req, res) {
     "Error while saving Songdata to database"
   )
   
+  const artistPlaceholders = artistIds.map(() => "(?,?)").join(",")
+  const artistData = artistIds.flatMap(artistId => [result.insertId, artistId])
+  const artistQuery = `insert into SongArtists (fk_SongId, fk_ArtistId) values ${artistPlaceholders}`
+
   await safeOperation(
-    async () => {
-      for (const artistId of artistIds) {
-        await db.query("insert into SongArtists (fk_SongId, fk_ArtistId) values (?,?)", [result.insertId, artistId])
-      }
-    },
+    () => db.query(artistQuery, artistData),
     "Error while inserting Artist references"
   )
   
   res.status(200).json({success: true, message: "Successfully downloaded the song and added it to account"})
+}
+
+// download playlist
+export async function downloadPlaylist(req, res) {
+  const {playlistURL} = req.body
+  checkReq(!playlistURL)
+  
+  const folderpath = `./data/songs/audio/.temp-${randomUUID()}`
+
+  const cropFilter = process.platform === "win32" ?
+    "if(gt(ih\\\\,iw)\\\\,iw\\\\,ih):if(gt(iw\\\\,ih)\\\\,ih\\\\,iw)" :
+    "if(gt(ih\\,iw)\\,iw\\,ih):if(gt(iw\\,ih)\\,ih\\,iw)"
+
+  const {stderr} = await safeOperation(
+    () => exec(`"${process.env.YTDLP_PATH}"` +
+              ` -x` +
+              ` --audio-format m4a` +
+              ` --audio-quality 0` +
+              ` --ffmpeg-location ${process.env.FFMPEG_PATH}` +
+              ` --embed-metadata` +
+              ` --embed-thumbnail` +
+              ` --add-metadata` +
+              ` --convert-thumbnails jpg` +
+              ` --ppa "ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=${cropFilter}"` +
+              ` -o "${folderpath}/%(playlist_index)s.m4a"` +
+              ` "${playlistURL}"`),
+    "Error while downloading the song"
+  )
+
+  if (stderr) console.warn('yt-dlp stderr:', stderr)
+
+  const allSongMetadata = []
+  const allArtistIds = []
+  const files = await readdir(folderpath)
+
+  for (const file of files.filter(file => file.endsWith(".m4a"))) {
+    const filename = randomUUID()
+    const songpath = `./data/songs/audio/${filename}.m4a`
+
+    await safeOperation(
+      () => rename(`${folderpath}/${file}`, songpath),
+      "Error while moving the audio file"
+    )
+
+    const metadata = await safeOperation(
+      () => parseFile(songpath),
+      "Error while reading metadata"
+    )
+
+    const common = metadata.common
+    const format = metadata.format
+
+    const splitArtists = common.artist?.split("，").map(artist => artist.trim()) || ""
+
+    const artistIds = []
+    if (splitArtists.length > 0) {
+      for (const artist of splitArtists) {
+        const [dbArtist] = await safeOperation(
+          () => db.query("select artistId from Artists where lower(artistName) = lower(?) and fk_UserDataId = ?", [artist, req.session.user.id]),
+          "Error while selecting artist from the database"
+        )
+
+        if (dbArtist.length === 0) {
+          const artistImageFileName = randomUUID()
+          const [[artistResult]] = await safeOperations([
+            () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
+            () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
+          ], "Error while inserting new artist")
+          artistIds.push(artistResult.insertId)
+        } else {
+          artistIds.push(dbArtist[0].artistId) 
+        }
+      }
+    }
+
+    if (common.picture && common.picture.length > 0) {
+      await writeFile(`./data/songs/cover/${filename}.jpg`, common.picture[0].data)
+    } else {
+      const randomNumber = Math.floor(Math.random() * 6) + 1
+      await copyFile(`./data/default-images/songs/${randomNumber}.jpg`, `./data/songs/cover/${filename}.jpg`)
+    }
+
+    allArtistIds.push(artistIds)
+    allSongMetadata.push([filename, common.title, common.genre, format.duration, common.year, req.session.user.id])
+  }
+
+  await safeOperation(
+    () => rmdir(folderpath),
+    "Error while deleting the temp folder"
+  )
+
+  const songPlaceholders = allSongMetadata.map(() => "(?,?,?,?,?,?)").join(",")
+  const flatSongMetadata = allSongMetadata.flat()
+  const songQuery = `insert into Songs (songFileName, title, genre, duration, releaseYear, fk_UserDataId) values ${songPlaceholders}`
+
+  const [songResult] = await safeOperation(
+    () => db.query(songQuery, flatSongMetadata),
+    "Error while saving Songdata to database"
+  )
+
+  const artistPlaceholders = allArtistIds.flat().map(() => "(?,?)").join(",")
+  let currentId = songResult.insertId
+  const artistData = allArtistIds.flatMap(artistIds => {
+    const data = artistIds.flatMap(artistId => [currentId, artistId])
+    currentId++
+    return data
+  })
+  const artistQuery = `insert into SongArtists (fk_SongId, fk_ArtistId) values ${artistPlaceholders}`
+
+  await safeOperation(
+    () => db.query(artistQuery, artistData),
+    "Error while inserting Artist references"
+  )
+
+  const {stdout} = await safeOperation(
+    () => exec(`"${process.env.YTDLP_PATH}" --dump-json --flat-playlist --playlist-items 1 "${playlistURL}"`),
+    "Error while getting playlist data"
+  )
+
+  const playlistName = JSON.parse(stdout).playlist || "Downloaded Playlist"
+  const playlistFileName = randomUUID()
+
+  await safeOperation(
+    () => copyFile(`./data/songs/cover/${allSongMetadata[0][0]}.jpg`, `./data/playlist-covers/${playlistFileName}.jpg`),
+    "Error while saving playlist cover"
+  )
+
+  const [playlistResult] = await safeOperation(
+    () => db.query(`insert into Playlists (playlistName, playlistDescription, playlistCoverFileName, fk_UserDataId)
+                   values (?,?,?,?)`, [playlistName, "", playlistFileName, req.session.user.id]),
+    "Error while inserting playlist into database"
+  )
+
+  currentId = songResult.insertId
+  const playlistSongPlaceholders = allSongMetadata.map(() => "(?,?)").join(",")
+  const playlistSongData = allSongMetadata.flatMap(() => {
+    const data = [playlistResult.insertId, currentId]
+    currentId++
+    return data
+  })
+  const playlistSongQuery = `insert into PlaylistSongs (fk_PlaylistId, fk_SongId) values ${playlistSongPlaceholders}`
+
+  await safeOperation(
+    () => db.query(playlistSongQuery, playlistSongData),
+    "Error while inserting songs into the playlist"
+  )
+
+  res.status(200).json({success: true, message: "Successfully downloaded the playlist and added it to account"})
 }
 
 // browse songs with soundcloud

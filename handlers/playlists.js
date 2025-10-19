@@ -27,7 +27,7 @@ export async function createPlaylist(req, res) {
     "Error while saving cover"
   )
   
-  const result = await safeOperation(
+  const [result] = await safeOperation(
     () => db.query(`insert into Playlists (playlistName, playlistDescription, playlistCoverFileName, fk_UserDataId)
                    values (?,?,?,?)`, [stringName, stringDescription, filename, req.session.user.id]),
     "Error while inserting playlist into database"

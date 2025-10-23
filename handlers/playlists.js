@@ -18,10 +18,10 @@ export async function createPlaylist(req, res) {
   await safeOperation(
     async () => {
       if (cover) {
-        await sharp(cover[0].filepath).jpeg().toFile(`./playlist-covers/${filename}.jpg`)
+        await sharp(cover[0].filepath).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(`./playlist-covers/${filename}.avif`)
       } else {
         const randomNumber = Math.floor(Math.random() * 6) + 1
-        await copyFile(`./data/default-images/playlists/${randomNumber}.jpg`, `./data/playlist-covers/${filename}.jpg`)
+        await copyFile(`./data/default-images/playlists/${randomNumber}.avif`, `./data/playlist-covers/${filename}.avif`)
       }
     },
     "Error while saving cover"
@@ -33,7 +33,7 @@ export async function createPlaylist(req, res) {
     "Error while inserting playlist into database"
   )
 
-  const coverUrl = `${req.protocol}://${req.get('host')}/playlists/cover/${filename}.jpg`
+  const coverUrl = `${req.protocol}://${req.get('host')}/playlists/cover/${filename}.avif`
 
   const playlist = {
     playlistId: result.insertId,
@@ -67,10 +67,10 @@ export async function editPlaylist(req, res) {
       if (name) await db.query("update Playlists set playlistName = ? where playlistId = ?", [name, playlistId])
       if (description || description === "") await db.query("update Playlists set playlistDescription = ? where playlistId = ?", [description, playlistId])
       if (cover) {
-        const coverFilepath = `./data/playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`
+        const coverFilepath = `./data/playlist-covers/${dbPlaylist.playlistCoverFileName}.avif`
 
         await unlink(coverFilepath)
-        await sharp(cover[0].filepath).jpeg().toFile(coverFilepath)
+        await sharp(cover[0].filepath).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(coverFilepath)
       }
     },
     "Error while updating playlist metadata"
@@ -95,7 +95,7 @@ export async function deletePlaylist(req, res) {
   await safeOperation(
     async () => {
       await db.query("delete from Playlists where playlistId = ?", [playlistId])
-      await unlink(`./data/playlist-covers/${dbPlaylist.playlistCoverFileName}.jpg`)
+      await unlink(`./data/playlist-covers/${dbPlaylist.playlistCoverFileName}.avif`)
     },
     "Error while deleting playlist"
   )
@@ -231,7 +231,7 @@ export async function getCover(req, res) {
   const filename = req.params.filename
 
   const [[dbUser]] = await safeOperation(
-    () => db.query("select fk_UserDataId from Playlists where playlistCoverFileName = ?", [filename.slice(0, -4)]),
+    () => db.query("select fk_UserDataId from Playlists where playlistCoverFileName = ?", [filename.slice(0, -5)]),
     "Error while checking the covers owner"
   )
 

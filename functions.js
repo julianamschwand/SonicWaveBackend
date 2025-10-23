@@ -1,6 +1,6 @@
 export function formatSongs(req, songs) {
   return songs.map(song => {
-    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.jpg`
+    const coverURL = `${req.protocol}://${req.get('host')}/songs/cover/${song.songFileName}.avif`
     const parsedArtists = JSON.parse(song.artists)
 
     return {
@@ -19,7 +19,7 @@ export function formatSongs(req, songs) {
 
 export function formatPlaylists(req, playlists, songs) {
   return playlists.map(playlist => {
-    const coverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.jpg`
+    const coverURL = `${req.protocol}://${req.get('host')}/playlists/cover/${playlist.playlistCoverFileName}.avif`
 
     let parsedSongs = []
     if (!songs) parsedSongs = JSON.parse(playlist.songs)

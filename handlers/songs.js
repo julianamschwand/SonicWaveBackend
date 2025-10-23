@@ -126,7 +126,7 @@ export async function downloadSong(req, res) {
         const artistImageFileName = randomUUID()
         const [[artistResult]] = await safeOperations([
           () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
-          () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
+          () => copyFile("./data/default-images/artist.avif", `./data/artist-images/${artistImageFileName}.avif`)
         ], "Error while inserting new artist")
         artistIds.push(artistResult.insertId)
       } else {
@@ -136,10 +136,10 @@ export async function downloadSong(req, res) {
   }
 
   if (common.picture && common.picture.length > 0) {
-    await writeFile(`./data/songs/cover/${filename}.jpg`, common.picture[0].data)
+    await sharp(common.picture[0].data).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(`./data/songs/cover/${filename}.avif`)
   } else {
     const randomNumber = Math.floor(Math.random() * 6) + 1
-    await copyFile(`./data/default-images/songs/${randomNumber}.jpg`, `./data/songs/cover/${filename}.jpg`)
+    await copyFile(`./data/default-images/songs/${randomNumber}.avif`, `./data/songs/cover/${filename}.avif`)
   }
 
   const [result] = await safeOperation(
@@ -225,7 +225,7 @@ export async function downloadPlaylist(req, res) {
           const artistImageFileName = randomUUID()
           const [[artistResult]] = await safeOperations([
             () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
-            () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
+            () => copyFile("./data/default-images/artist.avif", `./data/artist-images/${artistImageFileName}.avif`)
           ], "Error while inserting new artist")
           artistIds.push(artistResult.insertId)
         } else {
@@ -235,10 +235,10 @@ export async function downloadPlaylist(req, res) {
     }
 
     if (common.picture && common.picture.length > 0) {
-      await writeFile(`./data/songs/cover/${filename}.jpg`, common.picture[0].data)
+      await sharp(common.picture[0].data).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(`./data/songs/cover/${filename}.avif`)
     } else {
       const randomNumber = Math.floor(Math.random() * 6) + 1
-      await copyFile(`./data/default-images/songs/${randomNumber}.jpg`, `./data/songs/cover/${filename}.jpg`)
+      await copyFile(`./data/default-images/songs/${randomNumber}.avif`, `./data/songs/cover/${filename}.avif`)
     }
 
     allArtistIds.push(artistIds)
@@ -282,7 +282,7 @@ export async function downloadPlaylist(req, res) {
   const playlistFileName = randomUUID()
 
   await safeOperation(
-    () => copyFile(`./data/songs/cover/${allSongMetadata[0][0]}.jpg`, `./data/playlist-covers/${playlistFileName}.jpg`),
+    () => copyFile(`./data/songs/cover/${allSongMetadata[0][0]}.avif`, `./data/playlist-covers/${playlistFileName}.avif`),
     "Error while saving playlist cover"
   )
 
@@ -373,7 +373,7 @@ export async function browseSongs(req, res) {
       const cleanTitle = title ? (title).replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "") : title
       const cleanArtist = artist ? (artist).replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "") : artist
       const cleanGenre = genre ? (genre).replace(/amp;/g, "").replace(/&#x27;/g, "'").replace(/&[^;]+;/g, "") : genre
-      const defaultCoverURL = `${req.protocol}://${req.get('host')}/default-images/songs/${Math.floor(Math.random() * 6) + 1}.jpg`
+      const defaultCoverURL = `${req.protocol}://${req.get('host')}/default-images/songs/${Math.floor(Math.random() * 6) + 1}.avif`
       
       return {
         title: cleanTitle,
@@ -432,7 +432,7 @@ export async function getCover(req, res) {
   const filename = req.params.filename
 
   const [[dbUser]] = await safeOperation(
-    () => db.query("select fk_UserDataId from Songs where songFileName = ?", [filename.slice(0, -4)]),
+    () => db.query("select fk_UserDataId from Songs where songFileName = ?", [filename.slice(0, -5)]),
     "Error while checking the covers owner"
   )
 
@@ -474,7 +474,7 @@ export async function editSong(req, res) {
           if (!dbArtist) {
             const artistImageFileName = randomUUID()
             const [artistResult] = await db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id])
-            await copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
+            await copyFile("./data/default-images/artist.avif", `./data/artist-images/${artistImageFileName}.avif`)
             artistId = artistResult.insertId
           } else {
             artistId = dbArtist.artistId
@@ -487,10 +487,10 @@ export async function editSong(req, res) {
       if (genre || genre === "") await db.query("update Songs set genre = ? where songId = ?", [genre, songId])
       if (releaseYear) await db.query("update Songs set releaseYear = ? where songId = ?", [releaseYear, songId])
       if (cover) {
-        const coverFilepath = `./data/songs/cover/${dbSong.songFileName}.jpg`
+        const coverFilepath = `./data/songs/cover/${dbSong.songFileName}.avif`
 
         await unlink(coverFilepath)
-        await sharp(cover[0].filepath).jpeg().toFile(coverFilepath)
+        await sharp(cover[0].filepath).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(coverFilepath)
       }
     },
     "Error while updating song metadata"
@@ -514,7 +514,7 @@ export async function deleteSong(req, res) {
   
   await safeOperations([
     () => unlink(`./data/songs/audio/${dbSong.songFileName}.m4a`),
-    () => unlink(`./data/songs/cover/${dbSong.songFileName}.jpg`)
+    () => unlink(`./data/songs/cover/${dbSong.songFileName}.avif`)
   ], "Error while deleting song files")
 
   await safeOperation(
@@ -581,7 +581,7 @@ export async function resetSong(req, res) {
         const artistImageFileName = randomUUID()
         const [artistResult] = await safeOperations([
           () => db.query("insert into Artists (artistName, artistImageFileName, fk_UserDataId) values (?,?,?)", [artist, artistImageFileName, req.session.user.id]),
-          () => copyFile("./data/default-images/artist.jpg", `./data/artist-images/${artistImageFileName}.jpg`)
+          () => copyFile("./data/default-images/artist.avif", `./data/artist-images/${artistImageFileName}.avif`)
         ], "Error while inserting new artist")
         artistIds.push(artistResult.insertId)
       } else {
@@ -604,13 +604,13 @@ export async function resetSong(req, res) {
 	await safeOperation(
 		async () => {
 			if (common.picture && common.picture.length > 0) {
-				const coverFilepath = `./data/songs/cover/${dbSong.songFileName}.jpg`
+				const coverFilepath = `./data/songs/cover/${dbSong.songFileName}.avif`
 
 				await unlink(coverFilepath)
-				await writeFile(coverFilepath, common.picture[0].data)
+				await sharp(common.picture[0].data).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(`./data/songs/cover/${filename}.avif`)
 			} else {
 				const randomNumber = Math.floor(Math.random() * 6) + 1
-				await copyFile(`./data/default-images/songs/${randomNumber}.jpg`, `./data/songs/cover/${filename}.jpg`)
+				await copyFile(`./data/default-images/songs/${randomNumber}.avif`, `./data/songs/cover/${filename}.avif`)
 			}
 		},
 		"Error while resetting the cover"

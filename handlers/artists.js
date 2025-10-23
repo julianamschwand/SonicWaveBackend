@@ -18,7 +18,7 @@ export async function allArtists(req, res) {
   )
 
   const formattedArtists = artists.map(artist => {
-    const imageURL = `${req.protocol}://${req.get('host')}/artists/image/${artist.artistImageFileName}.jpg`
+    const imageURL = `${req.protocol}://${req.get('host')}/artists/image/${artist.artistImageFileName}.avif`
     const parsedSongs = JSON.parse(artist.songs)
 
     return {
@@ -65,7 +65,7 @@ export async function singleArtist(req, res) {
     "Error while fetching songs from database"
   )
 
-  const imageURL = `${req.protocol}://${req.get('host')}/artists/image/${artist.artistImageFileName}.jpg`
+  const imageURL = `${req.protocol}://${req.get('host')}/artists/image/${artist.artistImageFileName}.avif`
   const formattedArtist = {
     artistId: artist.artistId,
     name: artist.artistName,
@@ -97,10 +97,10 @@ export async function editArtist(req, res) {
       if (name) await db.query("update Artists set artistName = ? where artistId = ?", [name, artistId])
       if (description || description === "") await db.query("update Artists set artistDescription = ? where artistId = ?", [description, artistId])
       if (image) {
-        const imageFilePath = `./data/artist-images/${dbArtist.artistImageFileName}.jpg`
+        const imageFilePath = `./data/artist-images/${dbArtist.artistImageFileName}.avif`
         
         await unlink(imageFilePath)
-        await sharp(image[0].filepath).jpeg().toFile(imageFilePath)
+        await sharp(image[0].filepath).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(imageFilePath)
       }
     },
     "Error while editing artist"
@@ -113,7 +113,7 @@ export async function getImage(req, res) {
   const filename = req.params.filename
 
   const [[dbUser]] = await safeOperation(
-    () => db.query("select fk_UserDataId from Artists where artistImageFileName = ?", [filename.slice(0, -4)]),
+    () => db.query("select fk_UserDataId from Artists where artistImageFileName = ?", [filename.slice(0, -5)]),
     "Error while checking the covers owner"
   )
 

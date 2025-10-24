@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt'
+import { rm } from 'fs/promises'
 import { db } from '../db/db.js'
 import { mailer } from '../mailer.js'
 import { safeOperation, safeOperations, HttpError, checkReq } from '../error-handling.js'
@@ -206,10 +207,43 @@ export async function deleteUser(req, res) {
   if (dbUser.userRole === "owner") return res.status(403).json({success: false, message: "Can't delete owner"})
   if (dbUser.userRole === "admin" && reqUser.userRole !== "owner" && dbUser.userDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Only the owner or the account owner can delete an admin"})
   
-  await safeOperation(
-    () => db.query("delete from UserData where userDataId = ?", [userDataId]),
-    "Error while deleting user"
+  const [songFilenames] = await safeOperation(
+    () => db.query("select songFileName from Songs where fk_UserDataId = ?", [userDataId]),
+    "Error while retrieving song filenames from database"
   )
+
+  const songAudioFiles = songFilenames.map(filename => `./data/songs/audio/${filename.songFileName}.m4a`)
+  const songCoverFiles = songFilenames.map(filename => `./data/songs/cover/${filename.songFileName}.avif`)
+
+  const [playlistFilenames] = await safeOperation(
+    () => db.query("select playlistCoverFileName from Playlists where fk_UserDataId = ?", [userDataId]),
+    "Error while retrieving playlist filenames from database"
+  )
+
+  const playlistCoverFiles = playlistFilenames.map(filename => `./data/playlist-covers/${filename.playlistCoverFileName}.avif`)
+
+  const [artistFilenames] = await safeOperation(
+    () => db.query("select artistImageFileName from Artists where fk_UserDataId = ?", [userDataId]),
+    "Error while retrieving artist filenames from database"
+  )
+
+  const artistImageFiles = artistFilenames.map(filename => `./data/artist-images/${filename.artistImageFileName}.avif`)
+
+  await safeOperation(
+    async () => {
+      for (const file of [...songAudioFiles, ...songCoverFiles, ...playlistCoverFiles, ...artistImageFiles]) {
+        await rm(file)
+      }
+    },
+    "Error while deleting files"
+  )
+
+  await safeOperations([
+    () => db.query("delete from Songs where fk_UserDataId = ?", [userDataId]),
+    () => db.query("delete from Playlists where fk_UserDataId = ?", [userDataId]),
+    () => db.query("delete from Artists where fk_UserDataId = ?", [userDataId]),
+    () => db.query("delete from UserData where userDataId = ?", [userDataId]),
+  ], "Error while deleting user")
 
   res.status(200).json({success: true, message: `Successfully deleted '${dbUser.username}'`})
 }

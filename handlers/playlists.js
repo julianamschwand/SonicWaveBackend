@@ -94,8 +94,8 @@ export async function deletePlaylist(req, res) {
 
   await safeOperation(
     async () => {
-      await db.query("delete from Playlists where playlistId = ?", [playlistId])
       await unlink(`./data/playlist-covers/${dbPlaylist.playlistCoverFileName}.avif`)
+      await db.query("delete from Playlists where playlistId = ?", [playlistId])
     },
     "Error while deleting playlist"
   )

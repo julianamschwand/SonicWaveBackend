@@ -6,10 +6,10 @@ import { randomUUID } from 'crypto'
 import { exec as execCb } from 'child_process'
 import { parseFile } from 'music-metadata'
 import { createReadStream } from 'fs'
-import { unlink, writeFile, copyFile, stat, readdir, rename, rm, rmdir } from 'fs/promises'
+import { unlink, copyFile, stat, readdir, rename, rmdir } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
-import { formatSongs } from '../functions.js'
+import { formatSongs, asyncSpawn } from '../general-functions.js'
 dotenv.config()
 
 const exec = util.promisify(execCb)
@@ -85,20 +85,25 @@ export async function downloadSong(req, res) {
     "if(gt(ih\\\\,iw)\\\\,iw\\\\,ih):if(gt(iw\\\\,ih)\\\\,ih\\\\,iw)" :
     "if(gt(ih\\,iw)\\,iw\\,ih):if(gt(iw\\,ih)\\,ih\\,iw)"
 
+   const ytdlpParams = [
+    "-x",
+    "--audio-format", "m4a",
+    "--audio-quality", "0",
+    "--ffmpeg-location", process.env.FFMPEG_PATH,
+    "--embed-metadata",
+    "--embed-thumbnail",
+    "--add-metadata",
+    "--no-playlist",
+    "--convert-thumbnails", "jpg",
+    "--ppa", `ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=${cropFilter}`,
+    "-o", songpath,
+    songURL
+  ]
+
   const {stderr} = await safeOperation(
-    () => exec(`"${process.env.YTDLP_PATH}"` +
-              ` -x` +
-              ` --audio-format m4a` +
-              ` --audio-quality 0` +
-              ` --ffmpeg-location ${process.env.FFMPEG_PATH}` +
-              ` --embed-metadata` +
-              ` --embed-thumbnail` +
-              ` --add-metadata` +
-              ` --no-playlist` +
-              ` --convert-thumbnails jpg` +
-              ` --ppa "ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=${cropFilter}"` +
-              ` -o "${songpath}"` +
-              ` "${songURL}"`),
+    () => asyncSpawn(process.env.YTDLP_PATH, ytdlpParams, (data) => {
+      console.log(data)
+    }),
     "Error while downloading the song"
   )
 
@@ -171,20 +176,25 @@ export async function downloadPlaylist(req, res) {
   const cropFilter = process.platform === "win32" ?
     "if(gt(ih\\\\,iw)\\\\,iw\\\\,ih):if(gt(iw\\\\,ih)\\\\,ih\\\\,iw)" :
     "if(gt(ih\\,iw)\\,iw\\,ih):if(gt(iw\\,ih)\\,ih\\,iw)"
+  
+  const ytdlpParams = [
+    "-x",
+    "--audio-format", "m4a",
+    "--audio-quality", "0",
+    "--ffmpeg-location", process.env.FFMPEG_PATH,
+    "--embed-metadata",
+    "--embed-thumbnail",
+    "--add-metadata",
+    "--convert-thumbnails", "jpg",
+    "--ppa", `ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=${cropFilter}`,
+    "-o", `${folderpath}/%(playlist_index)s.m4a`,
+    playlistURL
+  ]
 
   const {stderr} = await safeOperation(
-    () => exec(`"${process.env.YTDLP_PATH}"` +
-              ` -x` +
-              ` --audio-format m4a` +
-              ` --audio-quality 0` +
-              ` --ffmpeg-location ${process.env.FFMPEG_PATH}` +
-              ` --embed-metadata` +
-              ` --embed-thumbnail` +
-              ` --add-metadata` +
-              ` --convert-thumbnails jpg` +
-              ` --ppa "ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=${cropFilter}"` +
-              ` -o "${folderpath}/%(playlist_index)s.m4a"` +
-              ` "${playlistURL}"`),
+    () => asyncSpawn(process.env.YTDLP_PATH, ytdlpParams, (data) => {
+      console.log(data)
+    }),
     "Error while downloading the song"
   )
 

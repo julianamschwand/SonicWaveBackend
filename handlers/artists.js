@@ -2,7 +2,7 @@ import { db } from '../db/db.js'
 import { unlink } from 'fs/promises'
 import sharp from 'sharp'
 import { safeOperation, checkReq } from '../error-handling.js'
-import { formatSongs } from '../functions.js'
+import { formatSongs } from '../general-functions.js'
 
 
 export async function allArtists(req, res) {

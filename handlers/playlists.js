@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto'
 import { unlink, copyFile } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, checkReq } from '../error-handling.js'
-import { formatPlaylists } from '../functions.js'
+import { formatPlaylists } from '../general-functions.js'
 
 // make a new playlist
 export async function createPlaylist(req, res) {

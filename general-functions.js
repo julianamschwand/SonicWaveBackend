@@ -50,13 +50,18 @@ export function asyncSpawn(command, args, onData) {
     child.stdout.on('data', (data) => {
       const str = data.toString()
       stdout += str
-      onData(str)
+      try {
+        onData(str)
+      } catch (error) {
+        error.stdout = stdout
+        error.stderr = stderr
+        reject(error)
+      }
     })
 
     child.stderr.on('data', (data) => {
       const str = data.toString()
       stderr += str
-      onData(str)
     })
 
     child.on('error', reject)
@@ -71,4 +76,8 @@ export function asyncSpawn(command, args, onData) {
       }
     })
   })
+}
+
+export function sendSSE(res, event, data) {
+  return res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 }

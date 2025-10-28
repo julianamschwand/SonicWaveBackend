@@ -6,25 +6,41 @@ export class HttpError extends Error {
   }
 }
 
-export function routeWrapper(handler) {
+export function routeWrapper(handler, sse = false) {
   return async function (req, res, next) {
 
     try {
+      if (sse) {
+        res.setHeader("Content-Type", "text/event-stream")
+        res.setHeader("Cache-Control", "no-cache")
+        res.setHeader("Connection", "keep-alive")
+        res.setHeader("X-Accel-Buffering", "no")
+      }
+
       await handler(req, res, next)
     } catch (error) {
-      if (!(error instanceof HttpError)) {
+      const sendError = (data, errorStatus) => {
+        if (sse) {
+          res.write(`event: error\ndata: ${JSON.stringify(data)}\n\n`)
+          res.end()
+        } 
+        else res.status(errorStatus).json(data)
+      }
+
+      if (error instanceof HttpError) {
+        if (error.json) sendError({success: false, message: error.message, ...error.json}, error.status || 500)
+        else sendError({success: false, message: error.message}, error.status || 500)
+      } else {
         if (/'req.body' as it is undefined/.test(error.message)) {
-          res.status(400).json({success: false, message: "Body is missing"})
+          sendError({success: false, message: "Body is missing"}, 400)
         } else {
           console.error("Error", error)
-          res.status(500).json({success: false, message: "Unhandled error"})
+          sendError({success: false, message: "Unhandled error"}, 500)
         }
-        
-      } else {
-        if (error.json) res.status(error.status || 500).json({success: false, message: error.message, ...error.json})
-        else res.status(error.status || 500).json({success: false, message: error.message})
       }
     }
+
+    if (sse) res.end()
   }
 }
 

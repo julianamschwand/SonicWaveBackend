@@ -9,7 +9,7 @@ import { createReadStream } from 'fs'
 import { unlink, copyFile, stat, readdir, rename, rmdir } from 'fs/promises'
 import { db } from '../db/db.js'
 import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
-import { formatSongs, asyncSpawn } from '../general-functions.js'
+import { formatSongs, asyncSpawn, sendSSE } from '../general-functions.js'
 dotenv.config()
 
 const exec = util.promisify(execCb)
@@ -75,7 +75,7 @@ export async function playSong(req, res) {
 
 // download a song by URL
 export async function downloadSong(req, res) {
-  const {songURL} = req.body
+  const {songURL} = req.query
   checkReq(!songURL)
 
   const filename = randomUUID()
@@ -100,14 +100,13 @@ export async function downloadSong(req, res) {
     songURL
   ]
 
-  const {stderr} = await safeOperation(
+  await safeOperation(
     () => asyncSpawn(process.env.YTDLP_PATH, ytdlpParams, (data) => {
-      console.log(data)
+      const match = data.match(/\[download\]\s+([\d.]+)%.*?at\s+([\d.]+[MKG]iB\/s)/)
+      if (match) sendSSE(res, "download", { progress: parseFloat(match[1]), speed: match[2] })
     }),
     "Error while downloading the song"
   )
-
-  if (stderr) console.warn('yt-dlp stderr:', stderr)
 
   const metadata = await safeOperation(
     () => parseFile(songpath),
@@ -135,10 +134,12 @@ export async function downloadSong(req, res) {
         ], "Error while inserting new artist")
         artistIds.push(artistResult.insertId)
       } else {
-        artistIds.push(dbArtist[0].artistId) 
+        artistIds.push(dbArtist[0].artistId)
       }
     }
   }
+
+  sendSSE(res, "action", { desc: "Converting cover ..." })
 
   if (common.picture && common.picture.length > 0) {
     await sharp(common.picture[0].data).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(`./data/songs/cover/${filename}.avif`)
@@ -147,12 +148,16 @@ export async function downloadSong(req, res) {
     await copyFile(`./data/default-images/songs/${randomNumber}.avif`, `./data/songs/cover/${filename}.avif`)
   }
 
+  sendSSE(res, "action", { desc: "Inserting song into database ..." })
+
   const [result] = await safeOperation(
     () => db.query(`insert into Songs (songFileName, title, genre, duration, releaseYear, fk_UserDataId)
                     values (?,?,?,?,?,?)`,
                     [filename, common.title, common.genre, format.duration, common.year, req.session.user.id]),
     "Error while saving Songdata to database"
   )
+
+  sendSSE(res, "action", { desc: "Inserting artists into database ..." })
   
   const artistPlaceholders = artistIds.map(() => "(?,?)").join(",")
   const artistData = artistIds.flatMap(artistId => [result.insertId, artistId])
@@ -163,12 +168,12 @@ export async function downloadSong(req, res) {
     "Error while inserting Artist references"
   )
   
-  res.status(200).json({success: true, message: "Successfully downloaded the song and added it to account"})
+  sendSSE(res, "done", { success: true, message: "Successfully downloaded the song and added it to account" })
 }
 
 // download playlist
 export async function downloadPlaylist(req, res) {
-  const {playlistURL} = req.body
+  const {playlistURL} = req.query
   checkReq(!playlistURL)
   
   const folderpath = `./data/songs/audio/.temp-${randomUUID()}`
@@ -191,18 +196,28 @@ export async function downloadPlaylist(req, res) {
     playlistURL
   ]
 
-  const {stderr} = await safeOperation(
+  let currentItem = 0
+  let maxItems = 0
+
+  await safeOperation(
     () => asyncSpawn(process.env.YTDLP_PATH, ytdlpParams, (data) => {
-      console.log(data)
+      const itemMatch = data.match(/\[download\]\s+Downloading\s+item\s+(\d+)\s+of\s+(\d+)/)
+      if (itemMatch) {
+        currentItem = Number(itemMatch[1])
+        maxItems = Number(itemMatch[2])
+      }
+
+      const progressMatch = data.match(/\[download\]\s+([\d.]+)%.*?at\s+([\d.]+[MKG]iB\/s)/)
+      if (progressMatch) sendSSE(res, "download", { progress: Number(progressMatch[1]), speed: progressMatch[2], currentSong: currentItem, maxSongs: maxItems })
     }),
     "Error while downloading the song"
   )
 
-  if (stderr) console.warn('yt-dlp stderr:', stderr)
-
   const allSongMetadata = []
   const allArtistIds = []
   const files = await readdir(folderpath)
+
+  sendSSE(res, "action", { desc: "Converting covers ..." })
 
   for (const file of files.filter(file => file.endsWith(".m4a"))) {
     const filename = randomUUID()
@@ -260,6 +275,8 @@ export async function downloadPlaylist(req, res) {
     "Error while deleting the temp folder"
   )
 
+  sendSSE(res, "action", { desc: "Inserting songs into database ..." })
+
   const songPlaceholders = allSongMetadata.map(() => "(?,?,?,?,?,?)").join(",")
   const flatSongMetadata = allSongMetadata.flat()
   const songQuery = `insert into Songs (songFileName, title, genre, duration, releaseYear, fk_UserDataId) values ${songPlaceholders}`
@@ -268,6 +285,8 @@ export async function downloadPlaylist(req, res) {
     () => db.query(songQuery, flatSongMetadata),
     "Error while saving Songdata to database"
   )
+
+  sendSSE(res, "action", { desc: "Inserting artists into database ..." })
 
   const artistPlaceholders = allArtistIds.flat().map(() => "(?,?)").join(",")
   let currentId = songResult.insertId
@@ -282,6 +301,8 @@ export async function downloadPlaylist(req, res) {
     () => db.query(artistQuery, artistData),
     "Error while inserting Artist references"
   )
+
+  sendSSE(res, "action", { desc: "Creating playlist ..." })
 
   const {stdout} = await safeOperation(
     () => exec(`"${process.env.YTDLP_PATH}" --dump-json --flat-playlist --playlist-items 1 "${playlistURL}"`),
@@ -316,7 +337,7 @@ export async function downloadPlaylist(req, res) {
     "Error while inserting songs into the playlist"
   )
 
-  res.status(200).json({success: true, message: "Successfully downloaded the playlist and added it to account"})
+  sendSSE(res, "done", { success: true, message: "Successfully downloaded the playlist and added it to account" })
 }
 
 // browse songs with soundcloud

@@ -7,8 +7,8 @@ import * as songHandlers from '../handlers/songs.js'
 const songRouter = express.Router()
 
 songRouter.get("/play", checkAuth, routeWrapper(songHandlers.playSong))
-songRouter.post("/download-song", checkAuth, routeWrapper(songHandlers.downloadSong))
-songRouter.post("/download-playlist", checkAuth, routeWrapper(songHandlers.downloadPlaylist))
+songRouter.get("/download-song", checkAuth, routeWrapper(songHandlers.downloadSong, true))
+songRouter.get("/download-playlist", checkAuth, routeWrapper(songHandlers.downloadPlaylist, true))
 songRouter.get("/browse", checkAuth, routeWrapper(songHandlers.browseSongs))
 songRouter.get("/", checkAuth, routeWrapper(songHandlers.allSongs))
 songRouter.get("/single", checkAuth, routeWrapper(songHandlers.song))

@@ -2,7 +2,7 @@ import sharp from 'sharp'
 import { randomUUID } from 'crypto'
 import { unlink, copyFile } from 'fs/promises'
 import { db } from '../db/db.js'
-import { safeOperation, checkReq } from '../error-handling.js'
+import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
 import { formatPlaylists } from '../general-functions.js'
 
 // make a new playlist
@@ -126,10 +126,20 @@ export async function addToPlaylist(req, res) {
 
   const songUsers = dbSongs.map(dbSong => dbSong.fk_UserDataId)
   if (songUsers.some(userId => userId !== req.session.user.id)) return res.status(403).json({success: false, message: "Not your song"})
+
+  const [[{maxIndex}]] = await safeOperation(
+    () => db.query("select max(playlistIndex) as maxIndex from PlaylistSongs where fk_PlaylistId = ?", [playlistId]),
+    "Error while fetching biggest playlist index from database"
+  )
   
-  const placeholders = songIds.map(() => "(?,?)").join(",")
-  const values = songIds.flatMap(songId => [playlistId, songId])
-  const songQuery = "insert into PlaylistSongs (fk_PlaylistId, fk_SongId) values " + placeholders
+  let playlistIndex = maxIndex || -1
+  
+  const placeholders = songIds.map(() => "(?,?,?)").join(",")
+  const values = songIds.flatMap(songId => {
+    playlistIndex++
+    return [playlistIndex, playlistId, songId]
+  })
+  const songQuery = "insert into PlaylistSongs (playlistIndex, fk_PlaylistId, fk_SongId) values " + placeholders
   
   await safeOperation(
     () => db.query(songQuery, values),
@@ -167,10 +177,10 @@ export async function deleteFromPlaylist(req, res) {
 
   if (!dbPlaylistSong) return res.status(404).json({success: false, message: "Song is not in playlist"})
   
-  await safeOperation(
-    () => db.query("delete from PlaylistSongs where fk_PlaylistId = ? and fk_SongId = ?", [playlistId, songId]),
-    "Error while deleting the song from the playlist"
-  )
+  await safeOperations([
+    () => db.query("update PlaylistSongs set playlistIndex = playlistIndex - 1 where playlistIndex > ? and fk_PlaylistId = ?", [dbPlaylistSong.playlistIndex, playlistId]),
+    () => db.query("delete from PlaylistSongs where fk_PlaylistId = ? and fk_SongId = ?", [playlistId, songId])
+  ], "Error while deleting the song from the playlist")
 
   res.status(200).json({success: true, message: "Successfully deleted song from playlist"})
 }
@@ -178,7 +188,7 @@ export async function deleteFromPlaylist(req, res) {
 // get all playlists without songs
 export async function allPlaylists(req, res) {
   const [playlists] = await safeOperation(
-    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as duration, json_arrayagg(songId) as songs
+    () => db.query(`select playlistId, playlistName, playlistDescription, playlistCoverFileName, count(songId) as songCount, sum(duration) as duration, json_arrayagg(songId order by playlistIndex) as songs
                     from Playlists
                     left join PlaylistSongs on playlistId = fk_PlaylistId
                     left join Songs on songId = fk_SongId
@@ -219,7 +229,7 @@ export async function playlist(req, res) {
                     join PlaylistSongs on PlaylistSongs.fk_SongId = songId
                     where fk_PlaylistId = ?
                     group by songId 
-                    order by playlistSongId`, [playlistId]),
+                    order by playlistIndex`, [playlistId]),
     "Error while fetching playlist songs from the database"
   )
 
@@ -239,4 +249,31 @@ export async function getCover(req, res) {
   if (dbUser.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your cover"})
   
   res.status(200).sendFile(`${process.cwd()}/data/playlist-covers/${filename}`)
+}
+
+// update the order of songs in the playlist
+export async function updateOrder(req, res) {
+  const {playlistId, songId, oldIndex, newIndex} = req.body
+  checkReq(!playlistId || oldIndex == null || newIndex == null)
+
+  const [[dbPlaylist]] = await safeOperation(
+    () => db.query("select fk_UserDataId from Playlists where playlistId = ?", [playlistId]),
+    "Error while fetching playlist from database"
+  )
+
+  if (!dbPlaylist) return res.status(404).json({success: false, message: "Playlist not found"})
+  if (dbPlaylist.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your playlist"})
+
+  const [condition, action] = oldIndex < newIndex ?
+    [`playlistIndex > ? and playlistIndex <= ?`, "-"] : 
+    [`playlistIndex < ? and playlistIndex >= ?`, "+"]
+  
+  const query = `update PlaylistSongs set playlistIndex = playlistIndex ${action} 1 where ${condition} and fk_PlaylistId = ?`
+
+  await safeOperations([
+    () => db.query(query, [oldIndex, newIndex, playlistId]),
+    () => db.query("update PlaylistSongs set playlistIndex = ? where fk_PlaylistId = ? and fk_SongId = ?", [newIndex, playlistId, songId])
+  ], "Error while updating playlist order")
+
+  res.status(200).json({success: true, message: "Successfully updated the playlist order"})
 }

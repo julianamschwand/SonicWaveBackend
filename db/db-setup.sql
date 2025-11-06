@@ -19,7 +19,7 @@ create table Playlists (
 
 create table Artists (
   artistId int unsigned primary key auto_increment,
-  artistName varchar(100),
+  artistName varchar(100) unique,
   artistDescription text,
   artistImageFileName char(36),
   fk_UserDataId int unsigned,
@@ -49,6 +49,7 @@ create table SongArtists(
 
 create table PlaylistSongs (
   playlistSongId int unsigned primary key auto_increment,
+  playlistIndex int unsigned,
   fk_PlaylistId int unsigned,
   fk_SongId int unsigned,
   foreign key (fk_PlaylistId) references Playlists(playlistId) on delete cascade,

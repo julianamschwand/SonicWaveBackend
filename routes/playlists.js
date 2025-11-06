@@ -14,5 +14,6 @@ playlistRouter.delete("/delete-song", checkAuth, routeWrapper(playlistHandlers.d
 playlistRouter.get("/", checkAuth, routeWrapper(playlistHandlers.allPlaylists))
 playlistRouter.get("/single", checkAuth, routeWrapper(playlistHandlers.playlist))
 playlistRouter.get("/cover/:filename", checkAuth, routeWrapper(playlistHandlers.getCover))
+playlistRouter.patch("/update-order", checkAuth, routeWrapper(playlistHandlers.updateOrder))
 
 export default playlistRouter

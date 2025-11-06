@@ -7,5 +7,5 @@ export default async function initCronJobs() {
   await refreshNewgrounds()
   await updateYtdlp()
   cron.schedule('0 0 */24 * * *', refreshNewgrounds)
-  cron.schedule('0 0 */1 * * *', updateYtdlp)
+  cron.schedule('0 0 */24 * * *', updateYtdlp)
 }

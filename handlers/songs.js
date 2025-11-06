@@ -324,13 +324,16 @@ export async function downloadPlaylist(req, res) {
   )
 
   currentId = songResult.insertId
-  const playlistSongPlaceholders = allSongMetadata.map(() => "(?,?)").join(",")
+  let playlistIndex = 0
+
+  const playlistSongPlaceholders = allSongMetadata.map(() => "(?,?,?)").join(",")
   const playlistSongData = allSongMetadata.flatMap(() => {
-    const data = [playlistResult.insertId, currentId]
+    const data = [playlistIndex, playlistResult.insertId, currentId]
     currentId++
+    playlistIndex++
     return data
   })
-  const playlistSongQuery = `insert into PlaylistSongs (fk_PlaylistId, fk_SongId) values ${playlistSongPlaceholders}`
+  const playlistSongQuery = `insert into PlaylistSongs (playlistIndex, fk_PlaylistId, fk_SongId) values ${playlistSongPlaceholders}`
 
   await safeOperation(
     () => db.query(playlistSongQuery, playlistSongData),

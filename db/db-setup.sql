@@ -19,7 +19,7 @@ create table Playlists (
 
 create table Artists (
   artistId int unsigned primary key auto_increment,
-  artistName varchar(100) unique,
+  artistName varchar(100),
   artistDescription text,
   artistImageFileName char(36),
   fk_UserDataId int unsigned,

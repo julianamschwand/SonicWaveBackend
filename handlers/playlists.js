@@ -18,7 +18,7 @@ export async function createPlaylist(req, res) {
   await safeOperation(
     async () => {
       if (cover) {
-        await sharp(cover[0].filepath).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(`./playlist-covers/${filename}.avif`)
+        await sharp(cover[0].filepath).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(`./data/playlist-covers/${filename}.avif`)
       } else {
         const randomNumber = Math.floor(Math.random() * 6) + 1
         await copyFile(`./data/default-images/playlists/${randomNumber}.avif`, `./data/playlist-covers/${filename}.avif`)

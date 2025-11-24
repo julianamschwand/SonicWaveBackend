@@ -637,14 +637,14 @@ export async function resetSong(req, res) {
   
 	await safeOperation(
 		async () => {
-			if (common.picture && common.picture.length > 0) {
-				const coverFilepath = `./data/songs/cover/${dbSong.songFileName}.avif`
+      const coverFilepath = `./data/songs/cover/${dbSong.songFileName}.avif`
 
+			if (common.picture && common.picture.length > 0) {
 				await unlink(coverFilepath)
-				await sharp(common.picture[0].data).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(`./data/songs/cover/${filename}.avif`)
+				await sharp(common.picture[0].data).resize({ width: 1000, height: 1000, fi: 'inside', withoutEnlargement: true }).avif({ quality: 60, effort: 6 }).toFile(coverFilepath)
 			} else {
 				const randomNumber = Math.floor(Math.random() * 6) + 1
-				await copyFile(`./data/default-images/songs/${randomNumber}.avif`, `./data/songs/cover/${filename}.avif`)
+				await copyFile(`./data/default-images/songs/${randomNumber}.avif`, coverFilepath)
 			}
 		},
 		"Error while resetting the cover"

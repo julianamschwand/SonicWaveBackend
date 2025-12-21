@@ -1,4 +1,4 @@
-import util from 'util'
+import { promisify } from 'util'
 import dotenv from 'dotenv'
 import axios from 'axios'
 import sharp from 'sharp'
@@ -12,7 +12,7 @@ import { safeOperation, safeOperations, checkReq } from '../error-handling.js'
 import { formatSongs, asyncSpawn, sendSSE } from '../general-functions.js'
 dotenv.config()
 
-const exec = util.promisify(execCb)
+const exec = promisify(execCb)
 
 // stream a song to a client
 export async function playSong(req, res) {
@@ -81,11 +81,7 @@ export async function downloadSong(req, res) {
   const filename = randomUUID()
   const songpath = `./data/songs/audio/${filename}.m4a`
 
-  const cropFilter = process.platform === "win32" ?
-    "if(gt(ih\\\\,iw)\\\\,iw\\\\,ih):if(gt(iw\\\\,ih)\\\\,ih\\\\,iw)" :
-    "if(gt(ih\\,iw)\\,iw\\,ih):if(gt(iw\\,ih)\\,ih\\,iw)"
-
-   const ytdlpParams = [
+  const ytdlpParams = [
     "-x",
     "--audio-format", "m4a",
     "--audio-quality", "0",
@@ -95,7 +91,6 @@ export async function downloadSong(req, res) {
     "--add-metadata",
     "--no-playlist",
     "--convert-thumbnails", "jpg",
-    "--ppa", `ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=${cropFilter}`,
     "-o", songpath,
     songURL
   ]
@@ -177,10 +172,6 @@ export async function downloadPlaylist(req, res) {
   checkReq(!playlistURL)
   
   const folderpath = `./data/songs/audio/.temp-${randomUUID()}`
-
-  const cropFilter = process.platform === "win32" ?
-    "if(gt(ih\\\\,iw)\\\\,iw\\\\,ih):if(gt(iw\\\\,ih)\\\\,ih\\\\,iw)" :
-    "if(gt(ih\\,iw)\\,iw\\,ih):if(gt(iw\\,ih)\\,ih\\,iw)"
   
   const ytdlpParams = [
     "-x",
@@ -191,7 +182,6 @@ export async function downloadPlaylist(req, res) {
     "--embed-thumbnail",
     "--add-metadata",
     "--convert-thumbnails", "jpg",
-    "--ppa", `ThumbnailsConvertor+ffmpeg_o:-c:v mjpeg -vf crop=${cropFilter}`,
     "-o", `${folderpath}/%(playlist_index)s.m4a`,
     playlistURL
   ]

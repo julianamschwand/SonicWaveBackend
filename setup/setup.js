@@ -1,12 +1,15 @@
 import axios from 'axios'
 import bcrypt from 'bcrypt'
-import AdmZip from 'adm-zip'
-import { extract } from 'tar'
+import decompress from 'decompress'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import { promises as readlinePromises} from 'readline' 
 import { queryRootDB } from './root-db.js'
 import { randomBytes } from 'crypto'
 import { createWriteStream } from 'fs'
-import { chmod, mkdir, writeFile, readFile, rm } from 'fs/promises'
+import { chmod, mkdir, writeFile, rm } from 'fs/promises'
+import { readDBSetup } from './modules.js'
+const execFilePromise = promisify(execFile)
 
 async function setupWizard() {
   // checking os
@@ -37,8 +40,15 @@ async function setupWizard() {
   await mkdir("./data/artist-images", { recursive: true })
 
   // ask for db credentials
-  const rootPass = await input.question("Enter your MariaDB / MySQL root password: ")
-  const dbHost = await input.question("Enter your database host: ")
+  let dbHost = ""
+  let rootPass = ""
+  
+  if (os === "linux") {
+    await input.question("Using localhost for database init. Press any button to continue ...")
+  } else {
+    dbHost = await input.question("Enter your database host: ")
+    rootPass = await input.question("Enter your MariaDB / MySQL root password: ")
+  }
 
   // check if db exists
   const result = await queryRootDB(rootPass, dbHost, 
@@ -81,13 +91,8 @@ async function setupWizard() {
 
     console.log("Setting up database ...")
 
-    let setupScript = ""
-    try {
-      setupScript = await readFile("./db/db-setup.sql", "utf-8")
-    } catch (error) {
-      console.error("Error while reading db-setup.sql")
-    }
-    
+    const setupScript = await readDBSetup()
+
     userPass = randomBytes(16).toString("hex")
 
     await queryRootDB(rootPass, dbHost,
@@ -97,28 +102,26 @@ async function setupWizard() {
       ${setupScript}
       insert into UserData (username, email, passwordHash, userRole, approved) 
       values ('${ownerName}','${ownerEmail}','${hashedOwnerPassword}','owner',true);
-      drop user if exists 'SonicWaveUser'@'localhost';
-      create user 'SonicWaveUser'@'${dbHost}' identified by '${userPass}';
-      grant all privileges on SonicWave.* to 'SonicWaveUser'@'${dbHost}';
+      drop user if exists 'SonicWaveUser'@'${dbHost || "localhost"}';
+      create user 'SonicWaveUser'@'${dbHost || "localhost"}' identified by '${userPass}';
+      grant all privileges on SonicWave.* to 'SonicWaveUser'@'${dbHost || "localhost"}';
       flush privileges;`
     )
+
     console.log("Successfully set up database")
   } else {
     console.log("Didn't create database")
     userPass = await input.question("Password for database user: ")
   }
 
-  // yt-dlp, spotDL and ffmpeg download
-  const downloads = ["ytdlp", "spotdl", "ffmpeg"]
+  // yt-dlp and ffmpeg download
+  const downloads = ["ytdlp", "ffmpeg"]
   const paths = {}
 
   const urls = {
     win32_ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
     linux_ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux",
     darwin_ytdlp: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos",
-    win32_spotdl: "https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-win32.exe",
-    linux_spotdl: "https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-linux",
-    darwin_spotdl: "https://github.com/spotDL/spotify-downloader/releases/download/v4.2.11/spotdl-4.2.11-darwin",
     win32_ffmpeg: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-7.1.zip",
     linux_ffmpeg: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-linux64-gpl-7.1.tar.xz",
     darwin_ffmpeg: "https://evermeet.cx/ffmpeg/get/zip"
@@ -160,25 +163,14 @@ async function setupWizard() {
     if (filenameSplit.length > 1) {
       const fileSuffix = filenameSplit[filenameSplit.length - 1]
       if (fileSuffix === "zip") {
-        console.log("extract")
-        const zip = new AdmZip(downloadpath)
-        zip.extractAllTo("./bin/", true)
+        await decompress(downloadpath, "./bin/")
         await rm(downloadpath)
       } else if (fileSuffix === "xz") {
-        await extract({
-          file: downloadpath,
-          C: "./bin/"
-        })
+        await execFilePromise("tar", ["-xJf", downloadpath, "-C", "./bin/"])
         await rm(downloadpath)
       }
     }
   }
-
-  // saving yt-dlp version as a file so it can be automatically updated
-  const ytdlpVersionResponse = await axios.get("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")
-  const ytdlpVersion = ytdlpVersionResponse.data.tag_name
-
-  await writeFile("./bin/yt-dlp-version", ytdlpVersion, "utf-8")
   
   // asking for additional ENV information
   let nodeEnvAnswer = ""
@@ -207,16 +199,12 @@ async function setupWizard() {
   const smtpUser = await input.question("Enter your SMTP user: ")
   const smtpPass = await input.question("Enter your SMTP password: ")
 
-  // // asking for spotify app credentials for spotDL
-  // const spotifyClientId = input.question("Enter your spotify app client id: ")
-  // const spotifyClientSecret = input.question("Enter your spotify app client secret: ")
-
   // writing .env file
   console.log("Creating .env file ...")
 
   let envContent = `DB_NAME="SonicWave"\n` + 
   `DB_USER="SonicWaveUser"\n` +
-  `DB_HOST="${dbHost}"\n` +
+  `DB_HOST="${dbHost || "localhost"}"\n` +
   `DB_PASS="${userPass}"\n\n` +
   `SESSION_SECRET="${randomBytes(16).toString("hex")}"\n\n` +
   `NODE_ENV="${nodeEnv}"\n` +
@@ -226,12 +214,11 @@ async function setupWizard() {
   `SMTP_HOST="${smtpHost}"\n` +
   `SMTP_PORT="${smtpPort}"\n` +
   `SMTP_USER="${smtpUser}"\n` +
-  `SMTP_PASS="${smtpPass}"\n`/* +
-  `SPOTIFY_CLIENT_ID="${spotifyClientId}"\n` +
-  `SPOTIFY_CLIENT_SECRET="${spotifyClientSecret}"\n`*/
+  `SMTP_PASS="${smtpPass}"\n`
 
+  const ffmpegSuffixLength = process.platform === "linux" ? 7 : 4
   for (const [key, value] of Object.entries(paths)) {
-    envContent += `\n${key.toUpperCase()}_PATH="${key === "ffmpeg" ? value.slice(0, -4) + "/bin" : value}"`
+    envContent += `\n${key.toUpperCase()}_PATH="${key === "ffmpeg" ? value.slice(0, -ffmpegSuffixLength)  + "/bin" : value}"`
   }
 
   await writeFile("./.env", envContent, "utf-8")

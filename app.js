@@ -19,8 +19,10 @@ import cleanup from './middleware/cleanup.js'
 
 dotenv.config()
 
-if (!existsSync("./.env")) {
+if (!existsSync("./.env") && !process.env.DOCKER) {
   await setupWizard()
+} else if (process.env.DOCKER && !existsSync("./docker-env.json")) {
+  await dockerInit()
 }
 
 const app = express()

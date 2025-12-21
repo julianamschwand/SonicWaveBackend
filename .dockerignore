@@ -1,0 +1,8 @@
+.env
+.gitignore
+.vscode
+node_modules
+songs
+playlist-covers
+artist-images
+bin

@@ -171,7 +171,7 @@ export async function deleteFromPlaylist(req, res) {
   if (dbSong.fk_UserDataId !== req.session.user.id) return res.status(403).json({success: false, message: "Not your song"})
 
   const [[dbPlaylistSong]] = await safeOperation(
-    () => db.query("select * from PlayListSongs where fk_PlaylistId = ? and fk_SongId = ?", [playlistId, songId]),
+    () => db.query("select * from PlaylistSongs where fk_PlaylistId = ? and fk_SongId = ?", [playlistId, songId]),
     "Error while getting the playlist song"
   )
 
